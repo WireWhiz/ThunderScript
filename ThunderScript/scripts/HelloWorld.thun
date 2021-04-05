@@ -1,0 +1,10 @@
+// this is a comment
+
+# this is a preprocessor
+
+def main()
+{
+    float output = 69;
+    float out2 = 420;
+    return out2;
+}
