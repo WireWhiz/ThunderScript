@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <map>
 #include <stack>
+#include <any>
 #include "massert.h"
 
 namespace ts
@@ -14,13 +15,60 @@ namespace ts
 
 	//define our bytecode commands;
 
-	const std::byte tsRETURN   = (std::byte)0;
-	const std::byte tsALLOCATEF= (std::byte)1;
-	const std::byte tsPUSH     = (std::byte)2;
-	const std::byte tsPOP      = (std::byte)3;
-	const std::byte tsCOPY     = (std::byte)4;
-	const std::byte tsLOADF    = (std::byte)5;
-	const std::byte tsADD      = (std::byte)6;
+	const std::byte tsPUSH      = (std::byte)0; // open a scope
+	const std::byte tsPOP       = (std::byte)1; // exit a scope
+	const std::byte tsRETURNF   = (std::byte)2; // return a float
+	const std::byte tsALLOCATEF = (std::byte)3; // allocate a float var
+	const std::byte tsREADF     = (std::byte)4; // load float from bytecode into operator var
+	const std::byte tsLOADF     = (std::byte)5; // load float into operator var
+	const std::byte tsSTOREF    = (std::byte)6; // store opeator var in float
+	const std::byte tsFLIPF     = (std::byte)7; // store opeator var in float
+	const std::byte tsADDF      = (std::byte)8; // add operator vars and store in one of them
+
+	// Define our varible type, the language is statically typed but it's more simple on this side if we store every type of value in one class
+	class tsVariable
+	{
+	public:
+		enum class Type
+		{
+			tsFloat,
+			tsInt,
+			tsArray
+		};
+	protected:
+		std::any _value;
+		Type _type;
+	public:
+		Type GetType()
+		{
+			return _type;
+		}
+		tsVariable()
+		{
+		};
+		tsVariable(const tsVariable& v)
+		{
+			_type = v._type;
+			_value = v._value;
+		};
+		tsVariable(float value)
+		{
+			_type = Type::tsFloat;
+			_value = value;
+		}
+		void setValue(float value)
+		{
+			assert(_type == Type::tsFloat);
+			_value = value;
+		}
+		float getValue()
+		{
+			return std::any_cast<float>(_value);
+		}
+
+
+
+	};
 
 
 	class tsBytecode
@@ -67,10 +115,11 @@ namespace ts
 			bytes.push_back(o.b[2]);
 			bytes.push_back(o.b[3]);
 		}
-		void createInlineFloat(float value)
+		void READF(unsigned int oVarIndex, float value)
 		{
-			bytes.push_back(tsLOADF);
+			bytes.push_back(tsREADF);
 			addFloat(value);
+			bytes.push_back(std::byte(oVarIndex));
 		}
 		void addFloat(float value)
 		{
@@ -81,21 +130,32 @@ namespace ts
 			bytes.push_back(o.b[2]);
 			bytes.push_back(o.b[3]);
 		}
-		void ALLOCATEF()
+		void FLIPF(unsigned int oVarIndex)
+		{
+			bytes.push_back(tsFLIPF);
+			bytes.push_back(std::byte(oVarIndex));
+		}
+		void ALLOCATE(tsVariable::Type type)
 		{
 			bytes.push_back(tsALLOCATEF);
 		}
-		void ADD(unsigned int aIndex, unsigned int bIndex)
+		void ADDF(unsigned int oVarIndex)
 		{
-			bytes.push_back(tsADD);
-			addUint(aIndex);
-			addUint(bIndex);
+			bytes.push_back(tsADDF);
+			bytes.push_back(std::byte(oVarIndex));
 		}
-		void COPY(unsigned int sourceVar, unsigned int targetVar)
+		void STOREF(unsigned int oVarIndex, unsigned int targetVar)
 		{
-			bytes.push_back(tsCOPY);
-			addUint(sourceVar);
+			bytes.push_back(tsSTOREF);
+			bytes.push_back((std::byte)oVarIndex);
 			addUint(targetVar);
+		}
+		void LOADF(unsigned int targetVar, unsigned int oVarIndex)
+		{
+			bytes.push_back(tsLOADF);
+			addUint(targetVar);
+			bytes.push_back((std::byte)oVarIndex);
+
 		}
 		void PUSH()
 		{
@@ -105,58 +165,10 @@ namespace ts
 		{
 			bytes.push_back(tsPOP);
 		}
-		void RETURN(unsigned int varIndex)
+		void RETURNF()
 		{
-			bytes.push_back(tsRETURN);
-			addUint(varIndex);
+			bytes.push_back(tsRETURNF);
 		}
-	};
-
-	
-
-	class tsVariable 
-	{
-	public:
-		enum class Type
-		{
-			tsFloat
-		};
-	protected:
-		Type _type;
-	public:
-		Type GetType()
-		{
-			return _type;
-		}
-		virtual void setValue(float value) = 0;
-		virtual float getValue() = 0;
-	};
-
-	class tsFloat : public tsVariable
-	{
-	private:
-		float _value = 0;
-	public:
-		void setValue(float value)
-		{
-			_value = value;
-		}
-		float getValue()
-		{
-			return _value;
-		}
-		tsFloat()
-		{
-			_value = 0;
-			_type = tsVariable::Type::tsFloat;
-		}
-		tsFloat(float value)
-		{
-			_value = value;
-			_type = tsVariable::Type::tsFloat;
-		}
-		
-		
 	};
 
 	class tsStructDef
@@ -169,7 +181,7 @@ namespace ts
 	{
 	public:
 		tsStructDef* tsStructDef;
-		std::vector<tsFloat> varibles;
+		std::vector<tsVariable> varibles;
 	};
 
 	class tsStatement
@@ -201,7 +213,14 @@ namespace ts
 		std::vector<tsFunction> functions;
 	};
 
-	
+	struct tsScope
+	{
+		unsigned int numFloats;
+		tsScope(unsigned int _numFloats)
+		{
+			numFloats = _numFloats;
+		}
+	};
 
 	class tsContext
 	{
@@ -214,9 +233,11 @@ namespace ts
 	private:
 		tsContext* _context;
 
-		size_t scope = 0;
-		std::stack<size_t> scopes;
-		std::vector<tsFloat> stack;
+		
+		std::stack<tsScope> scopes;
+		std::vector<float> fStack;
+
+		std::any opVars[2] = { std::any(0), std::any(0) };
 
 	public:
 		tsRuntime(tsContext* context)
@@ -240,59 +261,66 @@ namespace ts
 			{
 				switch (bytecode.bytes[i])
 				{
-					case tsRETURN:
+					case tsRETURNF:
 					{
-						unsigned int varIndex = bytecode.readUint(++i);
-						std::cout << "Return: " << stack[varIndex].getValue() << std::endl;
+						std::cout << "Return: " << std::any_cast<float>(opVars[1]) << std::endl;
 						i = bytecode.bytes.size();
 						break;
 					}
 					case tsALLOCATEF:
 					{
-						std::cout << "Allocating float" << std::endl;
-						tsFloat v(0);
-						stack.push_back(v);
+						std::cout << "Expanding float array" << std::endl;
+						fStack.emplace_back(0);
 						break;
 					}
 					case tsPUSH:
 					{
-						scopes.push(stack.size());
+						scopes.push(tsScope(fStack.size()));
 						break;
 					}
 					case tsPOP:
 					{
-						stack.resize(scopes.top());
+						tsScope scope = scopes.top();
+						fStack.resize(scope.numFloats);
 						scopes.pop();
 						break;
 					}
+					case tsREADF:
+					{
+						std::cout << "Reading float" << std::endl;
+						float value = bytecode.readFloat(++i);
+						i += 4;
+						opVars[(char)bytecode.bytes[i]] = value;
+					}
+						break;
 					case tsLOADF:
 					{
-						std::cout << "Loading var" << std::endl;
-						float value = bytecode.readFloat(++i);
-						i += 3;
-						tsFloat v(value);
-						stack.push_back(v);
-					}
-					break;
-					case tsCOPY:
-					{
-						std::cout << "Copying var" << std::endl;
-						unsigned int a = bytecode.readUint(++i);
+						std::cout << "Loading float" << std::endl;
+						float varIndex = bytecode.readUint(++i);
 						i += 4;
-						unsigned int b = bytecode.readUint(i);
-						i += 3;
-						stack[b].setValue(stack[a].getValue());
-
+						opVars[(char)bytecode.bytes[i]] = fStack[varIndex];
+					}
 						break;
-					}
-					case tsADD:
+					case tsSTOREF:
 					{
-						std::cout << "Addign var" << std::endl;
-						unsigned int a = bytecode.readUint(++i);
-						i += 4;
-						unsigned int b = bytecode.readUint(i);
+						std::cout << "Storing float" << std::endl;
+						unsigned char opVar = (unsigned char)bytecode.bytes[++i];
+						fStack[bytecode.readUint(++i)] = std::any_cast<float>(opVars[opVar]);
 						i += 3;
-						std::cout << "Adding " << (float)stack[a].getValue() << " to " << (float)stack[b].getValue() << std::endl;
+						
+					}
+						break;
+					case tsFLIPF:
+					{
+						std::cout << "Flipping Float" << std::endl;
+						unsigned char opVar = (unsigned char)bytecode.bytes[++i];
+						opVars[opVar] = -std::any_cast<float>(opVars[opVar]);
+					}
+						break;
+					case tsADDF:
+					{
+						std::cout << "Adding: " << std::any_cast<float>(opVars[0]) << " + " << std::any_cast<float>(opVars[1]) << std::endl;
+						opVars[(unsigned char)bytecode.bytes[++i]] = std::any_cast<float>(opVars[0]) + std::any_cast<float>(opVars[1]);
 						break;
 					}
 					default:

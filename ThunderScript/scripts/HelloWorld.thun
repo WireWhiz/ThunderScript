@@ -4,7 +4,5 @@
 
 def main()
 {
-    float output = 69;
-    float out2 = 420;
-    return out2;
+    return 4 - 3 + 2;
 }

@@ -80,7 +80,8 @@ namespace ts
 	class tsCompiler
 	{
 		tsContext* _context;
-		std::vector<std::string> varID;
+		std::vector<std::string> fVars;
+
 	public:
 		bool compile(const std::string& path, tsContext* context)
 		{
@@ -104,9 +105,7 @@ namespace ts
 			processPreprocessors(scriptText, script);
 			std::vector<tsToken> tokens;
 			parseTokens(scriptText, tokens);
-			parseScriptStats(tokens, script);
 
-			std::cout << "Script stats | functions: " << script.numFunctions << " maxVars: " << script.maxVars << std::endl;
 			std::cout << "Tokens: " << std::endl << std::endl;
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
@@ -254,62 +253,20 @@ namespace ts
 			}
 			return false;
 		}
-		static void parseScriptStats(const std::vector<tsToken>& tokens, tsScript& script)
-		{
-			size_t maxVars = 0;
-			size_t numVars = 0;
-			std::stack<size_t> scope;
-			for (size_t i = 0; i < tokens.size(); i++)
-			{
-				if (tokens[i].type == tsToken::Type::tsReservedWord)
-				{
-					switch (tokens[i].tokenIndex)
-					{
-						case GetIndexOfReservedWord("def"): 
-							script.numFunctions += 1;
-							break;
-						case GetIndexOfReservedWord("float"): 
-							numVars += 1;
-							break;
-						default:
-							break;
-					}
-				}
-				else if (tokens[i].type == tsToken::Type::tsOperator)
-				{
-					switch (tokens[i].tokenIndex)
-					{
-						case GetIndexOfOperator("{"):
-							scope.push(numVars);
-							break;
-						case GetIndexOfOperator("}"):
-							numVars = scope.top();
-							scope.pop();
-							break;
-						default:
-							break;
-					}
-				}
-				if (numVars > maxVars)
-				{
-					maxVars = numVars;
-				}
-			}
-			script.maxVars = maxVars;
-		}
 	#pragma endregion
 
 	#pragma region Bytecode Generation
 
 		void GenerateBytecode(std::vector<tsToken> tokens, tsScript& script)
 		{
-			varID.clear();
+			
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
 				massert(tokens[i].type == tsToken::Type::tsReservedWord, "token was not of type reserved word, this means you haven't coded in error checking yet and you forgot how your own language works.");
 				switch (tokens[i].tokenIndex)
 				{
 					case GetIndexOfReservedWord("def"):
+						fVars.clear();
 						GenerateFunction(i, tokens, script);
 						break;
 					default:
@@ -358,22 +315,24 @@ namespace ts
 							{
 
 								//Store how many varibles are in the parent scope
-								size_t scopeVarCount = varID.size();
+								unsigned int fVarCount = fVars.size();
 
 								//enter a new scope
 								GenerateStatement(++i, tokens, bytecode);
 
 								//Delete the varible ids from the last scope
-								varID.resize(scopeVarCount);
+								fVars.resize(fVarCount);
 								break;
 							}
 							case GetIndexOfOperator(";"):
 								break;
 							default:
-								GenerateExpression(i, tokens, bytecode);
+								massert(false, "Unknown statement operator: " + std::to_string(tokens[i].tokenIndex));
+								//GenerateExpression(0, i, tokens, bytecode);
 								break;
 						}
 						break;
+						
 					case tsToken::Type::tsReservedWord:
 						switch (tokens[i].tokenIndex)
 						{
@@ -384,10 +343,12 @@ namespace ts
 								GenerateReturn(i, tokens, bytecode);
 								break;
 							default:
-								massert(false, "Unimplemented Reserved Word: " + tokens[i].token);
+								massert(false, "Unknown reserved word: " + tokens[i].token);
+								//GenerateExpression
 								break;
 						}
 						break;
+						
 					default:
 						GenerateExpression(i, tokens, bytecode);
 						break;
@@ -398,38 +359,45 @@ namespace ts
 			
 		}
 
-		unsigned int GenerateExpression(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		void GenerateExpression(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			switch (tokens[i].type)
 			{
 				case tsToken::Type::tsOperator:
+				{
+					switch (tokens[i].tokenIndex)
+					{
+
+						case GetIndexOfOperator("="):
+							break;
+					}
+				}
 					break;
 				case tsToken::Type::tsIdentifier:
 				{
 
 					unsigned int idIndex = 0;
-					if (GetIndexOfVar(tokens[i].token, idIndex))
+					if (GetIndexOfFloat(tokens[i].token, idIndex))
 					{
-						switch (tokens[++i].tokenIndex)
+						switch(tokens[++i].tokenIndex)
 						{
-							case GetIndexOfOperator("="):
-							{
-								bytecode.PUSH();
-								unsigned int scope = varID.size();
-								++i;
-								massert(tokens[i].type == tsToken::Type::tsIdentifier, "Unexpected " + tokens[i].token + " after =");
-								bytecode.COPY(GenerateExpression(i, tokens, bytecode), idIndex);
-								bytecode.POP();
-								varID.resize(scope);
-								break;
-							}
 							case GetIndexOfOperator(";"):
-							{
-								return idIndex;
-							}
-							default:
-								
-								massert(false, "Unimplemented operator (" + tokens[i].token + ") token index: " + std::to_string(i));
+								bytecode.LOADF(idIndex, 1);
+								break;
+							case GetIndexOfOperator("+"):
+								GenerateExpression(++i, tokens, bytecode);
+								bytecode.LOADF(idIndex, 0);
+								bytecode.ADDF(1);
+								break;
+							case GetIndexOfOperator("-"):
+								GenerateExpression(++i, tokens, bytecode);
+								bytecode.LOADF(idIndex, 0);
+								bytecode.FLIPF(1);
+								bytecode.ADDF(1);
+								break;
+							case GetIndexOfOperator("="):
+								GenerateExpression(++i, tokens, bytecode);
+								bytecode.STOREF(1, idIndex);
 								break;
 						}
 					}
@@ -449,12 +417,22 @@ namespace ts
 							{
 								case GetIndexOfOperator(";"):
 								{
-									size_t o = varID.size();
-									varID.push_back("inline float");
-									bytecode.createInlineFloat(value);
-									return o;
+									bytecode.READF(1, value);
+									return;
 									break;
 								}
+								case GetIndexOfOperator("+"):
+									GenerateExpression(++i, tokens, bytecode);
+									bytecode.READF(0, value);
+									bytecode.ADDF(1);
+									break;
+								case GetIndexOfOperator("-"):
+									GenerateExpression(++i, tokens, bytecode);
+									bytecode.READF(0, value);
+
+									bytecode.FLIPF(1);
+									bytecode.ADDF(1);
+									break;
 								default:
 									break;
 							}
@@ -479,11 +457,13 @@ namespace ts
 			
 		}
 
-		bool GetIndexOfVar(const std::string& id, unsigned int& index)
+		
+
+		bool GetIndexOfFloat(const std::string& id, unsigned int& index)
 		{
-			for (unsigned int i = 0; i < varID.size(); i++)
+			for (unsigned int i = 0; i < fVars.size(); i++)
 			{
-				if (varID[i] == id)
+				if (fVars[i] == id)
 				{
 					index = i;
 					return true;
@@ -496,13 +476,13 @@ namespace ts
 		{
 			return false;
 		}
-
+		
 		void GenerateFloat(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "float");
-			unsigned int index = varID.size();
-			varID.push_back(tokens[++i].token);
-			bytecode.ALLOCATEF();
+			unsigned int index = fVars.size();
+			fVars.push_back(tokens[++i].token);
+			bytecode.ALLOCATE(tsVariable::Type::tsFloat);
 			if (tokens[++i].token != ";")
 				GenerateExpression(--i, tokens, bytecode);
 			else
@@ -512,14 +492,15 @@ namespace ts
 		void GenerateReturn(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "return");
-			bytecode.RETURN(GenerateExpression(++i, tokens, bytecode));
+			GenerateExpression(++i, tokens, bytecode);
+			bytecode.RETURNF();
 		}
 
 		void GenerateStruct(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 
 		}
-
+		
 	#pragma endregion
 
 	};
