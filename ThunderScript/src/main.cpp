@@ -15,7 +15,7 @@ int main()
 		std::cin >> filePath;
 		if (filePath == "exit")
 			break;
-		ts::tsContext* tsc = new ts::tsContext;
+		std::shared_ptr<ts::tsContext> tsc = std::make_shared<ts::tsContext>();
 		
 		if (compiler.compile(filePath, tsc))
 		{
@@ -42,7 +42,6 @@ int main()
 		{
 			std::cout << "Could not find file." << std::endl;
 		}
-		delete tsc;
 
 	}
 	return 0;

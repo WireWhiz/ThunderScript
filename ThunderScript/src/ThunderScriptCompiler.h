@@ -28,7 +28,6 @@ namespace ts
 		}
 		return 0;
 	}
-
 	// Thunder Script Operators
 	constexpr std::array<const std::string_view, 14> tsOperators = {
 		// Longer Operators must be defined first or they will be mistaken for shorter ones
@@ -71,19 +70,153 @@ namespace ts
 		}
 	};
 
-	class tsParser
+	
+	// 0: variables, 1: add and subtract, 2: multiply and divide, 3: negate, 4: scope
+	class tsOperation
 	{
 	public:
-		
+		enum class DepSide
+		{
+			none,
+			left, 
+			right,
+			both
+		};
+		virtual unsigned int GetPriority() = 0;
+		virtual DepSide GetDepSide()
+		{
+			return DepSide::none;
+		};
+		virtual unsigned int  GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex) = 0;
 	};
+
+	// An operation dependant upon one other operation
+	class tsDOperator : public tsOperation
+	{
+	protected:
+		std::unique_ptr<tsOperation> _dep;
+	public:
+		void SetDep(std::unique_ptr<tsOperation>& dep)
+		{
+			_dep = std::move(dep);
+		}
+	};
+
+	// An operator with a dependancy on the left
+	class tsLOperator : public tsDOperator
+	{
+	public:
+		DepSide GetDepSide()
+		{
+			return DepSide::left;
+		}
+	};
+	// An operator with a dependancy on the right
+	class tsROperator : public tsDOperator
+	{
+	public:
+		DepSide GetDepSide()
+		{
+			return DepSide::right;
+		}
+	};
+
+	// An operation that has two dependancies
+	class tsDDOperator : public tsOperation
+	{
+	protected:
+		std::unique_ptr<tsOperation> _dep1;
+		std::unique_ptr<tsOperation> _dep2;
+	public:
+		DepSide GetDepSide()
+		{
+			return DepSide::both;
+		}
+		void SetDeps(std::unique_ptr<tsOperation>& dep1, std::unique_ptr<tsOperation>& dep2)
+		{
+			std::cout << "Input deps null: " << (dep1.get() == nullptr) << " and " << (dep1.get() == nullptr) << std::endl;
+			massert((dep1.get() != nullptr) && (dep2.get() != nullptr), "Input pointer(s) were null")
+			_dep1 = std::move(dep1);
+			_dep2 = std::move(dep2);
+			std::cout << "Deps null: " << (_dep1.get() == nullptr) << " and " << (_dep2.get() == nullptr) << std::endl;
+		}
+	};
+
+	/*
+	class tsScope : public tsOperation
+	{
+	protected:
+		std::vector<std::unique_ptr<tsOperation>> operations;
+	public:
+		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			for (size_t i = 0; i < operations.size(); i++)
+			{
+
+			}
+			return workingVarIndex;
+		}
+	};
+	*/
+
+	class tsFloatOperation : public tsOperation
+	{
+	public:
+		unsigned int varIndex;
+		tsFloatOperation(unsigned int index)
+		{
+			varIndex = index;
+		}
+		unsigned int GetPriority()
+		{
+			return 1;
+		}
+		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			std::cout << "Getting value index of float" << std::endl;
+			return varIndex;
+		}
+	};
+
+	class tsFloatAssignOperation : public tsDDOperator
+	{
+	public:
+		unsigned int GetPriority()
+		{
+			return 0;
+		}
+		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			bytecode.MOVEF(_dep2->GetValueIndex(bytecode, workingVarIndex), _dep1->GetValueIndex(bytecode, 1));
+			return workingVarIndex;
+		}
+	};
+
+	class tsAddOperation : public tsDDOperator
+	{
+	public:
+		unsigned int GetPriority()
+		{
+			return 2;
+		}
+		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			std::cout << "Getting value index of add operation" << std::endl;
+			massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
+			bytecode.ADDF(_dep1->GetValueIndex(bytecode, workingVarIndex), _dep2->GetValueIndex(bytecode, 1), workingVarIndex);
+			return workingVarIndex;
+		}
+	};
+
+	
 
 	class tsCompiler
 	{
-		tsContext* _context;
+		std::shared_ptr<tsContext> _context;
 		std::vector<std::string> fVars;
 
 	public:
-		bool compile(const std::string& path, tsContext* context)
+		bool compile(const std::string& path, std::shared_ptr<tsContext>& context)
 		{
 			// Read the script file. Return if we can't find it.
 			std::ifstream f;
@@ -218,9 +351,7 @@ namespace ts
 						}
 					}
 				}
-
 			}
-
 		}
 		static bool isOperator(size_t start, const std::string& script, int& token)
 		{
@@ -266,7 +397,7 @@ namespace ts
 				switch (tokens[i].tokenIndex)
 				{
 					case GetIndexOfReservedWord("def"):
-						fVars.clear();
+						
 						GenerateFunction(i, tokens, script);
 						break;
 					default:
@@ -282,14 +413,59 @@ namespace ts
 			i++;
 			tsFunction function(tokens[i].token);
 
+
+			fVars.clear();
+			fVars.emplace_back("storage var");// We know this will never be confused for a user defined varible because they cannot use spaces.
+			fVars.emplace_back("working var");
+			function.bytecode.ALLOCATEF();
+			function.bytecode.ALLOCATEF();
+
 			//For now we're going to ignore the paramaters of the function, because I'm impataent and want to get something working.
 			GetFunctionParams(++i, tokens, function);
+			GenerateConstVars(i, tokens, function.bytecode);
 			GenerateStatement(i, tokens, function.bytecode);
 
 			script.functions.push_back(function);
 		}
+		void GenerateConstVars(size_t& i, std::vector<tsToken>& tokens, tsBytecode& bytecode)
+		{
+			for(unsigned int token = 0; token < tokens.size(); token++)
+			{
+				if (tokens[token].type == tsToken::Type::tsIdentifier)
+				{
+					try
+					{
+						float value = std::stof(tokens[token].token); // try to cast string to float, if it fails it is not a float
+						std::cout << "Found const float: " << value << std::endl;
+						bool foundVar = false;
+						std::string key = "const float " + std::to_string(value);
+						for (unsigned int var = 0; var < fVars.size() && !foundVar; var++)
+						{
+							if (key == fVars[var])
+							{
+								std::cout << "Found predifined const float" << std::endl;
+								foundVar = true;
+							}
+						}
+						if (!foundVar)
+						{
+							std::cout << "Made new const float" << std::endl;
+							unsigned int varIndex = fVars.size();
+							bytecode.ALLOCATEF();
+							bytecode.LOADF(varIndex, value);
+							fVars.push_back(key);
+						}
+						tokens[token].token = key;
+					}
+					catch (...)
+					{
 
-		void GetFunctionParams(size_t& i, std::vector<tsToken> tokens, tsFunction& function)
+					}
+				}
+			}
+		}
+
+		void GetFunctionParams(size_t& i, const std::vector<tsToken>& tokens, tsFunction& function)
 		{
 			massert(tokens[i].token == "(", "Paramater block must start with a (");
 			i++;
@@ -301,11 +477,10 @@ namespace ts
 			massert(tokens[i].token == ")", "Paramater block must end with and )");
 			i++;
 		}
-		void GenerateStatement(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		void GenerateStatement(size_t& i, const std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			while (i < tokens.size() && tokens[i].token != "}")
 			{
-				std::cout << "First token in statement: " << tokens[i].token;
 				switch (tokens[i].type)
 				{
 					case tsToken::Type::tsOperator:
@@ -318,8 +493,8 @@ namespace ts
 								unsigned int fVarCount = fVars.size();
 
 								//enter a new scope
+								std::cout << "Generating statement" << std::endl;
 								GenerateStatement(++i, tokens, bytecode);
-
 								//Delete the varible ids from the last scope
 								fVars.resize(fVarCount);
 								break;
@@ -327,7 +502,7 @@ namespace ts
 							case GetIndexOfOperator(";"):
 								break;
 							default:
-								massert(false, "Unknown statement operator: " + std::to_string(tokens[i].tokenIndex));
+								massert(false, "Unknown statement operator: " + tokens[i].token);
 								//GenerateExpression(0, i, tokens, bytecode);
 								break;
 						}
@@ -350,7 +525,8 @@ namespace ts
 						break;
 						
 					default:
-						GenerateExpression(i, tokens, bytecode);
+						GenerateExpression(i, tokens, bytecode, 0);
+						std::cout << i << std::endl;
 						break;
 				}
 				++i;
@@ -359,105 +535,156 @@ namespace ts
 			
 		}
 
-		void GenerateExpression(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		void GenerateExpression(size_t& i, const std::vector<tsToken>& tokens, tsBytecode& bytecode, unsigned int returnVar)
 		{
-			switch (tokens[i].type)
+			std::cout << "Generating expression" << std::endl;
+			std::vector<std::unique_ptr<tsOperation>> operations;
+			size_t end = 0;
+			while (tokens[i + end].token != ";") ++end;
+			std::cout << "expression is " << end << " long " << std::endl;
+			std::vector opTokens(tokens.begin() + i, tokens.begin() + i + end);
+			GenerateOperations(opTokens, operations, 0);
+
+			for (size_t op = 0; op < operations.size(); op++)
 			{
-				case tsToken::Type::tsOperator:
+				std::cout << "ran get value index" << std::endl;
+				operations[op]->GetValueIndex(bytecode, 0);
+			}
+			i += end;
+			std::cout << "next token after expression: " << tokens[i].token << std::endl;
+			std::cout << i << std::endl;
+
+			/*
+			unsigned int aIndex = 0;
+			GetIndexOfFloat(tokens[i].token, aIndex);
+			++i;
+			if (tokens[i].token == ";" || tokens[i].token == ")")
+			{
+				bytecode.MOVEF(aIndex, returnVar);
+			}
+			else
+			{
+				while (tokens[i].token != ";" && tokens[i].token != ")")
 				{
+					switch (tokens[i].tokenIndex) // We know this should be an operator
+					{
+						case GetIndexOfOperator("="):
+						{
+							GenerateExpression(++i, tokens, bytecode, 0);
+							bytecode.MOVEF(0, aIndex);
+							return;
+						}
+						case GetIndexOfOperator("+"):
+						{
+							unsigned int bIndex = 0;
+							GetIndexOfFloat(tokens[++i].token, bIndex);
+							bytecode.ADDF(aIndex, bIndex, 0);
+							aIndex = 0;
+							break;
+						}
+						case GetIndexOfOperator("-"):
+						{
+							unsigned int bIndex = 0;
+							GetIndexOfFloat(tokens[++i].token, bIndex);
+							bytecode.MOVEF(bIndex, 1);
+							bytecode.FLIPF(1);
+							bytecode.ADDF(aIndex, 1, 0);
+							aIndex = 0;
+							break;
+						}
+						default:
+							break;
+					}
+			
+				
+					++i;
+				}
+				bytecode.MOVEF(0, returnVar);
+			}
+			*/
+		}
+
+		void GenerateOperations(const std::vector<tsToken>& tokens, std::vector<std::unique_ptr<tsOperation>>& operations, unsigned int workingVar)
+		{
+			for (size_t i = 0; i < tokens.size(); i++)
+			{
+				tsToken token = tokens[i];
+				if (token.type == tsToken::Type::tsIdentifier)
+				{
+					unsigned int index;
+					if (GetIndexOfFloat(token.token, index))
+					{
+						std::cout << "Found var" << std::endl;
+						operations.push_back(std::make_unique<tsFloatOperation>(index));
+					}
+				}
+				else if (token.type == tsToken::Type::tsOperator)
+				{
+
 					switch (tokens[i].tokenIndex)
 					{
+						case GetIndexOfOperator("("):
+						{
+							std::cout << "Found (" << std::endl;
+							int pCount = 1;
+							std::vector<tsToken> subOperations;
+							i++;
+							while (pCount > 0)
+							{
+								if (tokens[i].token == "(")
+									pCount++;
+								else if (tokens[i].token == ")")
+									pCount--;
+								if (pCount > 0)
+								{
+									subOperations.push_back(tokens[i]);
+								}
+							}
+							//operations.push_back(std::make)
+						}
+							break;
+						case GetIndexOfOperator("+"):
+							std::cout << "Found +" << std::endl;
 
+							operations.push_back(std::make_unique<tsAddOperation>());
+							break;
+						case GetIndexOfOperator("-"):
+							break;
 						case GetIndexOfOperator("="):
+							std::cout << "Found =" << std::endl;
+							operations.push_back(std::make_unique<tsFloatAssignOperation>());
 							break;
 					}
 				}
-					break;
-				case tsToken::Type::tsIdentifier:
+				else
+					massert(false, "Unknown expression reserved word: " + tokens[i].token);
+			}
+			
+			for (int priority = 5; priority >= 0; priority--)
+			{
+				for (unsigned int i = 0; i < operations.size(); i++)
 				{
-
-					unsigned int idIndex = 0;
-					if (GetIndexOfFloat(tokens[i].token, idIndex))
+					if (operations[i] -> GetPriority() == priority)
 					{
-						switch(tokens[++i].tokenIndex)
+						switch (operations[i] -> GetDepSide())
 						{
-							case GetIndexOfOperator(";"):
-								bytecode.LOADF(idIndex, 1);
-								break;
-							case GetIndexOfOperator("+"):
-								GenerateExpression(++i, tokens, bytecode);
-								bytecode.LOADF(idIndex, 0);
-								bytecode.ADDF(1);
-								break;
-							case GetIndexOfOperator("-"):
-								GenerateExpression(++i, tokens, bytecode);
-								bytecode.LOADF(idIndex, 0);
-								bytecode.FLIPF(1);
-								bytecode.ADDF(1);
-								break;
-							case GetIndexOfOperator("="):
-								GenerateExpression(++i, tokens, bytecode);
-								bytecode.STOREF(1, idIndex);
+							case tsOperation::DepSide::both:
+								std::cout << "Found double sided operator at index " << i << " at priority " << priority << std::endl;
+								dynamic_cast<tsDDOperator*>(operations[i].get()) -> SetDeps(operations[i - 1], operations[i + 1]);
+								
+								// We need to erase these pointers as they are no longer assigned
+								// Need to erase +1 first since otherwise the index for it would be off
+								operations.erase(operations.begin() + i + 1);
+								operations.erase(operations.begin() + i - 1);
+								// Need to step back because we deleted and index before this one
+								i--;
 								break;
 						}
 					}
-					else if (GetIndexOfFunction(tokens[i].token, idIndex))
-					{
-
-					}
-					else
-					{
-						bool isConst = false;;
-						try
-						{
-							float value = std::stof(tokens[i].token);
-							isConst = true;
-
-							switch (tokens[++i].tokenIndex)
-							{
-								case GetIndexOfOperator(";"):
-								{
-									bytecode.READF(1, value);
-									return;
-									break;
-								}
-								case GetIndexOfOperator("+"):
-									GenerateExpression(++i, tokens, bytecode);
-									bytecode.READF(0, value);
-									bytecode.ADDF(1);
-									break;
-								case GetIndexOfOperator("-"):
-									GenerateExpression(++i, tokens, bytecode);
-									bytecode.READF(0, value);
-
-									bytecode.FLIPF(1);
-									bytecode.ADDF(1);
-									break;
-								default:
-									break;
-							}
-						}
-						catch (const std::invalid_argument& ia)
-						{
-							
-						}
-						massert(isConst, "Unknown identifier: " + tokens[i].token + " Token index: " + std::to_string(i));
-					}
-
-					break;
 				}
-				case tsToken::Type::tsReservedWord:
-					massert(false, "You have not added any reserved words for expressions yet");
-
-					break;
-				default:
-					massert(false, std::string("Invalid expression type: ") + std::to_string((int)tokens[i].type));
-					break;
 			}
 			
 		}
-
-		
 
 		bool GetIndexOfFloat(const std::string& id, unsigned int& index)
 		{
@@ -482,9 +709,9 @@ namespace ts
 			assert(tokens[i].token == "float");
 			unsigned int index = fVars.size();
 			fVars.push_back(tokens[++i].token);
-			bytecode.ALLOCATE(tsVariable::Type::tsFloat);
+			bytecode.ALLOCATEF();
 			if (tokens[++i].token != ";")
-				GenerateExpression(--i, tokens, bytecode);
+				GenerateExpression(--i, tokens, bytecode, index);
 			else
 				++i;
 		}
@@ -492,7 +719,7 @@ namespace ts
 		void GenerateReturn(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "return");
-			GenerateExpression(++i, tokens, bytecode);
+			GenerateExpression(++i, tokens, bytecode, 0);
 			bytecode.RETURNF();
 		}
 

@@ -4,5 +4,9 @@
 
 def main()
 {
-    return 4 - 3 + 2;
+    float a = 1e2;
+    float b = 4e-2;
+    float meaningOfLife = 42;
+    a = a + b + 1 + meaningOfLife;
+    return a;
 }

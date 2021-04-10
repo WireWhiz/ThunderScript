@@ -53,6 +53,6 @@ void _assert(bool expression, const char* file, int line, const char* message)
 }
 
 #define assert(expression) _assert(expression, __FILE__, __LINE__); if(!(expression)) throw assertExcept
-#define massert(expression, message) _assert(expression, __FILE__, __LINE__, message); if(!(expression)) throw assertExcept
+#define massert(expression, message) {_assert(expression, __FILE__, __LINE__, message); if(!(expression)) throw assertExcept;}
 #endif
 
