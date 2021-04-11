@@ -24,6 +24,8 @@ namespace ts
 	const std::byte tsMOVEF     = (std::byte)5; // copy a float from one index to another
 	const std::byte tsFLIPF     = (std::byte)6; // store opeator var in float
 	const std::byte tsADDF      = (std::byte)7; // add operator vars and store in one of them
+	const std::byte tsMULF      = (std::byte)8; // multiply a float
+	const std::byte tsDIVF      = (std::byte)9; // divide a float
 
 	// Define our varible type, the language is statically typed but it's more simple on this side if we store every type of value in one class
 	class tsVariable
@@ -67,6 +69,8 @@ namespace ts
 			unsigned int i;
 			std::byte b[4];
 		};
+		std::stack<unsigned int> scope;
+		unsigned int numVars = 0;
 	public:
 		std::vector<std::byte> bytes;
 	
@@ -125,9 +129,10 @@ namespace ts
 			bytes.push_back(tsFLIPF);
 			addUint(varIndex);
 		}
-		void ALLOCATEF()
+		unsigned int ALLOCATEF()
 		{
 			bytes.push_back(tsALLOCATEF);
+			return ++numVars - 1;
 		}
 		void ADDF(unsigned int aIndex, unsigned int bIndex, unsigned int returnIndex)
 		{
@@ -136,13 +141,30 @@ namespace ts
 			addUint(bIndex);
 			addUint(returnIndex);
 		}
+		void MULF(unsigned int aIndex, unsigned int bIndex, unsigned int returnIndex)
+		{
+			bytes.push_back(tsMULF);
+			addUint(aIndex);
+			addUint(bIndex);
+			addUint(returnIndex);
+		}
+		void DIVF(unsigned int aIndex, unsigned int bIndex, unsigned int returnIndex)
+		{
+			bytes.push_back(tsDIVF);
+			addUint(aIndex);
+			addUint(bIndex);
+			addUint(returnIndex);
+		}
 		void PUSH()
 		{
 			bytes.push_back(tsPUSH);
+			scope.push(numVars);
 		}
 		void POP()
 		{
 			bytes.push_back(tsPOP);
+			numVars = scope.top();
+			scope.pop();
 		}
 		void RETURNF()
 		{
@@ -171,15 +193,7 @@ namespace ts
 		unsigned int mainFunction;
 		std::vector<tsFunction> functions;
 	};
-
-	struct tsScope
-	{
-		unsigned int numFloats;
-		tsScope(unsigned int _numFloats)
-		{
-			numFloats = _numFloats;
-		}
-	};
+	
 
 	class tsContext
 	{
@@ -280,6 +294,30 @@ namespace ts
 						stack[r]->SetValue( stack[a]->GetValue() + stack[b]->GetValue());
 						break;
 					}
+					case tsMULF:
+					{
+						unsigned int a = bytecode.readUint(++i);
+						i += 4;
+						unsigned int b = bytecode.readUint(i);
+						i += 4;
+						unsigned int r = bytecode.readUint(i);
+						i += 3;
+						std::cout << "Multiplying: " << stack[a]->GetValue() << " * " << stack[b]->GetValue() << std::endl;
+						stack[r]->SetValue(stack[a]->GetValue() * stack[b]->GetValue());
+					}
+						break;
+					case tsDIVF:
+					{
+						unsigned int a = bytecode.readUint(++i);
+						i += 4;
+						unsigned int b = bytecode.readUint(i);
+						i += 4;
+						unsigned int r = bytecode.readUint(i);
+						i += 3;
+						std::cout << "Dividing: " << stack[a]->GetValue() << " / " << stack[b]->GetValue() << std::endl;
+						stack[r]->SetValue(stack[a]->GetValue() / stack[b]->GetValue());
+					}
+					break;
 					default:
 					{
 
