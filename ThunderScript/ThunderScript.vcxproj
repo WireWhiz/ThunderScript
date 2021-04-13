@@ -153,6 +153,7 @@
     <ClInclude Include="src\massert.h" />
     <ClInclude Include="src\ThunderScript.h" />
     <ClInclude Include="src\ThunderScriptCompiler.h" />
+    <ClInclude Include="src\TSBytecodeDebugger.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="scripts\HelloWorld.thun" />

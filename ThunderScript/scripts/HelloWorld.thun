@@ -4,9 +4,7 @@
 
 def main()
 {
-    float a = 4;
-    float b = -2;
-    float meaningOfLife = -1;
-    a = a / (-b + meaningOfLife);
-    return a;
+    int i = 5;
+    float testFloat = 1 / -2 + (30.5 + 2) + i;
+    return testFloat;
 }

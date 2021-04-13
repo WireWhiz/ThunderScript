@@ -13,11 +13,12 @@
 namespace ts
 {
 	// Thunder Script Reserved Words
-	constexpr std::array<const std::string_view, 3> tsReservedWords = {
+	constexpr std::array<const std::string_view, 4> tsReservedWords = {
 		// Best practices, put the longer ones first just in case
 		"return", //To be removed, will be replaced with out structs
 		"def",
-		"float",
+		"int",
+		"float"
 	};
 	constexpr unsigned int GetIndexOfReservedWord(const char token[])
 	{
@@ -61,11 +62,13 @@ namespace ts
 		Type type;
 		std::string token;
 		int tokenIndex;
-		tsToken(Type _type, std::string& _token, int _tokenIndex)
+		size_t line;
+		tsToken(Type _type, std::string& _token, int _tokenIndex, size_t _line)
 		{
 			type = _type;
 			token = _token;
 			tokenIndex = _tokenIndex;
+			line = _line;
 
 		}
 	};
@@ -82,12 +85,13 @@ namespace ts
 			right,
 			both
 		};
-		virtual unsigned int GetPriority() = 0;
-		virtual DepSide GetDepSide()
+		virtual unsigned int getPriority() = 0;
+		virtual ValueType getType() = 0;
+		virtual DepSide getDepSide()
 		{
 			return DepSide::none;
 		};
-		virtual unsigned int  GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex) = 0;
+		virtual unsigned int  getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex) = 0;
 	};
 
 	// An operation dependant upon one other operation
@@ -96,7 +100,7 @@ namespace ts
 	protected:
 		std::unique_ptr<tsOperation> _dep;
 	public:
-		void SetDep(std::unique_ptr<tsOperation>& dep)
+		void setDep(std::unique_ptr<tsOperation>& dep)
 		{
 			_dep = std::move(dep);
 		}
@@ -106,7 +110,7 @@ namespace ts
 	class tsLOperator : public tsDOperator
 	{
 	public:
-		DepSide GetDepSide()
+		DepSide getDepSide()
 		{
 			return DepSide::left;
 		}
@@ -115,7 +119,7 @@ namespace ts
 	class tsROperator : public tsDOperator
 	{
 	public:
-		DepSide GetDepSide()
+		DepSide getDepSide()
 		{
 			return DepSide::right;
 		}
@@ -128,11 +132,22 @@ namespace ts
 		std::unique_ptr<tsOperation> _dep1;
 		std::unique_ptr<tsOperation> _dep2;
 	public:
-		DepSide GetDepSide()
+		DepSide getDepSide()
 		{
 			return DepSide::both;
 		}
-		void SetDeps(std::unique_ptr<tsOperation>& dep1, std::unique_ptr<tsOperation>& dep2)
+		ValueType getType()
+		{
+			ValueType t1 = _dep1->getType();
+			ValueType t2 = _dep2->getType();
+			if (t1 == t2)
+				return t1;
+			else if (t1 == ValueType::tsFloat || t2 == ValueType::tsFloat)
+				return ValueType::tsFloat;
+			else
+				return ValueType::tsUnknown;
+		}
+		void setDeps(std::unique_ptr<tsOperation>& dep1, std::unique_ptr<tsOperation>& dep2)
 		{
 			std::cout << "Input deps null: " << (dep1.get() == nullptr) << " and " << (dep1.get() == nullptr) << std::endl;
 			massert((dep1.get() != nullptr) && (dep2.get() != nullptr), "Input pointer(s) were null")
@@ -152,22 +167,47 @@ namespace ts
 		{
 			return operations;
 		}
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 5;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		ValueType getType()
+		{
+			return operations[operations.size() - 1]->getType();
+		}
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			
 			unsigned int localWorkingVar = bytecode.ALLOCATEF();
 			for (size_t i = 0; i < operations.size(); i++)
 			{
-				operations[i]->GetValueIndex(bytecode, localWorkingVar);
+				operations[i]->getValueIndex(bytecode, localWorkingVar);
 			}
 			return localWorkingVar;
 		}
 	};
-	
+	class tsIntOperation : public tsOperation
+	{
+	public:
+		unsigned int varIndex;
+		tsIntOperation(unsigned int index)
+		{
+			varIndex = index;
+		}
+		ValueType getType()
+		{
+			return ValueType::tsInt;
+		}
+		unsigned int getPriority()
+		{
+			return 1;
+		}
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			std::cout << "Getting value index of int" << std::endl;
+			return varIndex;
+		}
+	};
 
 	class tsFloatOperation : public tsOperation
 	{
@@ -177,28 +217,41 @@ namespace ts
 		{
 			varIndex = index;
 		}
-		unsigned int GetPriority()
+		ValueType getType()
+		{
+			return ValueType::tsFloat;
+		}
+		unsigned int getPriority()
 		{
 			return 1;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			std::cout << "Getting value index of float" << std::endl;
 			return varIndex;
 		}
 	};
 
-	class tsFloatAssignOperation : public tsDDOperator
+	class tsAssignOperation : public tsDDOperator
 	{
 	public:
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 0;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			bytecode.PUSH();
-			bytecode.MOVEF(_dep2->GetValueIndex(bytecode, workingVarIndex), _dep1->GetValueIndex(bytecode, 1));
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.MOVEF(_dep2->getValueIndex(bytecode, workingVarIndex), _dep1->getValueIndex(bytecode, 1));
+					break;
+				case ValueType::tsInt:
+					bytecode.MOVEI(_dep2->getValueIndex(bytecode, workingVarIndex), _dep1->getValueIndex(bytecode, 1));
+					break;
+			}
+			
 			bytecode.POP();
 			return workingVarIndex;
 		}
@@ -207,29 +260,49 @@ namespace ts
 	class tsAddOperation : public tsDDOperator
 	{
 	public:
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 2;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			std::cout << "Getting value index of add operation" << std::endl;
-			massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
-			bytecode.ADDF(_dep1->GetValueIndex(bytecode, workingVarIndex), _dep2->GetValueIndex(bytecode, 1), workingVarIndex);
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.ADDF(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, 1), workingVarIndex);
+					break;
+				case ValueType::tsInt:
+					bytecode.ADDI(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, 1), workingVarIndex);
+					break;
+			}
 			return workingVarIndex;
 		}
 	};
 
 	class tsNegateOperation : public tsROperator
 	{
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 4;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		ValueType getType()
 		{
-			bytecode.MOVEF(_dep->GetValueIndex(bytecode, workingVarIndex), workingVarIndex);
-			bytecode.FLIPF(workingVarIndex);
+			return _dep->getType();
+		}
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		{
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.MOVEF(_dep->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					bytecode.FLIPF(workingVarIndex);
+					break;
+				case ValueType::tsInt:
+					bytecode.MOVEI(_dep->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					bytecode.FLIPI(workingVarIndex);
+					break;
+			}
 			return workingVarIndex;
 		}
 	};
@@ -237,55 +310,120 @@ namespace ts
 	class tsSubtractOperation : public tsDDOperator
 	{
 	public:
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 2;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			std::cout << "Getting value index of subtract operation" << std::endl;
 			massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
-			bytecode.MOVEF(_dep2->GetValueIndex(bytecode, workingVarIndex), 1);
-			bytecode.FLIPF(1);
-			bytecode.ADDF(_dep1->GetValueIndex(bytecode, workingVarIndex), 1, workingVarIndex);
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.MOVEF(_dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					bytecode.FLIPF(workingVarIndex);
+					bytecode.ADDF(_dep1->getValueIndex(bytecode, workingVarIndex), 1, workingVarIndex);
+					break;
+				case ValueType::tsInt:
+					bytecode.MOVEI(_dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					bytecode.FLIPI(workingVarIndex);
+					bytecode.ADDI(_dep1->getValueIndex(bytecode, workingVarIndex), 1, workingVarIndex);
+					break;
+			}
 			return workingVarIndex;
 		}
 	};
 
 	class tsMultiplyOperation : public tsDDOperator
 	{
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 3;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		ValueType getType()
+		{
+			ValueType t1 = _dep1->getType();
+			ValueType t2 = _dep2->getType();
+			if (t1 == t2)
+				return t1;
+			else if (t1 == ValueType::tsFloat || t2 == ValueType::tsFloat)
+				return ValueType::tsFloat;
+			else
+				return ValueType::tsUnknown;
+		}
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			std::cout << "Getting value index of multiply operation" << std::endl;
 			massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
-			bytecode.MULF(_dep1->GetValueIndex(bytecode, workingVarIndex), _dep2->GetValueIndex(bytecode, workingVarIndex), workingVarIndex);
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.MULF(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					break;
+				case ValueType::tsInt:
+					bytecode.MULI(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					break;
+			}
 			return workingVarIndex;
 		}
 	};
 
 	class tsDivideOperation : public tsDDOperator
 	{
-		unsigned int GetPriority()
+		unsigned int getPriority()
 		{
 			return 3;
 		}
-		unsigned int GetValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
+		
+		unsigned int getValueIndex(tsBytecode& bytecode, const unsigned int& workingVarIndex)
 		{
 			std::cout << "Getting value index of divide operation" << std::endl;
 			massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
-			bytecode.DIVF(_dep1->GetValueIndex(bytecode, workingVarIndex), _dep2->GetValueIndex(bytecode, workingVarIndex), workingVarIndex);
+			switch (getType())
+			{
+				case ValueType::tsFloat:
+					bytecode.DIVF(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					break;
+				case ValueType::tsInt:
+					bytecode.DIVI(_dep1->getValueIndex(bytecode, workingVarIndex), _dep2->getValueIndex(bytecode, workingVarIndex), workingVarIndex);
+					break;
+			}
 			return workingVarIndex;
+		}
+	};
+
+	class tsIdentifier
+	{
+	public:
+		enum class IdentType
+		{
+			tsInt,
+			tsFloat,
+			tsFunction
+		};
+		IdentType type;
+		std::string token;
+		tsIdentifier()
+		{
+			assert(false);
+		}
+		tsIdentifier(const tsIdentifier& ident)
+		{
+			token = ident.token;
+			type = ident.type;
+		}
+		tsIdentifier(const std::string& _token, const IdentType _type)
+		{
+			token = _token;
+			type = _type;
 		}
 	};
 
 	class tsCompiler
 	{
 		std::shared_ptr<tsContext> _context;
-		std::vector<std::string> fVars;
+		std::vector<tsIdentifier> identifiers;
 
 	public:
 		bool compile(const std::string& path, std::shared_ptr<tsContext>& context)
@@ -371,6 +509,7 @@ namespace ts
 		{
 
 			tokens.clear();
+			size_t line = 0;
 			for (size_t i = 0; i < scriptText.length(); i++)
 			{
 				char currentChar = scriptText[i];// First we check if the current token is equal to any operators
@@ -385,7 +524,7 @@ namespace ts
 						token = tsOperators[tokenIndex];
 
 						// If it is add it to the vector and increment i
-						tokens.push_back(tsToken(tsToken::Type::tsOperator, token, tokenIndex));
+						tokens.push_back(tsToken(tsToken::Type::tsOperator, token, tokenIndex, line));
 						i += token.length() - 1;
 					}
 					// Then if it wasn't an operator check if it was a reserved word
@@ -393,7 +532,7 @@ namespace ts
 					{
 						token = tsReservedWords[tokenIndex];
 						// If it is add it to the vector and increment i
-						tokens.push_back(tsToken(tsToken::Type::tsReservedWord, token, tokenIndex));
+						tokens.push_back(tsToken(tsToken::Type::tsReservedWord, token, tokenIndex, line));
 						i += token.length() - 1;
 					}
 					// If it was not ether of those then it's an identifier or literal of some type
@@ -413,18 +552,21 @@ namespace ts
 						i--;
 						// When the loop ends we know we have the whole token so we can add it to the array
 						massert(token != "" && token != " ", "Somehow an empty identifier was found. This is wrong.");
-						tokens.push_back(tsToken(tsToken::Type::tsIdentifier, token, -1));
+						tokens.push_back(tsToken(tsToken::Type::tsIdentifier, token, -1, line));
 						// If we found an end token we migh as well save ourselves some time and add it as well
 						if (endTokenIndex >= 1)
 						{
 							std::string endToken = (std::string)tsOperators[endTokenIndex];
 							i += endToken.length();
-							tokens.push_back(tsToken(tsToken::Type::tsOperator, endToken, endTokenIndex));
+							tokens.push_back(tsToken(tsToken::Type::tsOperator, endToken, endTokenIndex, line));
 						}
 					}
 				}
+				if (currentChar == '\n')
+					line++;
 			}
 		}
+
 		static bool isOperator(size_t start, const std::string& script, int& token)
 		{
 			
@@ -486,9 +628,9 @@ namespace ts
 			tsFunction function(tokens[i].token);
 
 
-			fVars.clear();
-			fVars.emplace_back("storage var");// We know this will never be confused for a user defined varible because they cannot use spaces.
-			fVars.emplace_back("working var");
+			identifiers.clear();
+			identifiers.push_back(tsIdentifier( std::string("storage var"), tsIdentifier::IdentType::tsFloat));// We know this will never be confused for a user defined varible because they cannot use spaces.
+			identifiers.push_back(tsIdentifier(std::string("working var"), tsIdentifier::IdentType::tsFloat));
 			function.bytecode.ALLOCATEF();
 			function.bytecode.ALLOCATEF();
 
@@ -507,34 +649,72 @@ namespace ts
 				{
 					try
 					{
-						float value = std::stof(tokens[token].token); // try to cast string to float, if it fails it is not a float
-						std::cout << "Found const float: " << value << std::endl;
-						bool foundVar = false;
-						std::string key = "const float " + std::to_string(value);
-						for (unsigned int var = 0; var < fVars.size() && !foundVar; var++)
+						if (tokens[token].token.find(".") == std::string::npos)
 						{
-							if (key == fVars[var])
+							int value = std::stoi(tokens[token].token); // try to cast string to int, if it fails it is not a int
+							std::cout << "Found const int: " << value << std::endl;
+							bool foundVar = false;
+							std::string key = "const int " + std::to_string(value);
+							for (unsigned int var = 0; var < identifiers.size() && !foundVar; var++)
 							{
-								std::cout << "Found predifined const float" << std::endl;
-								foundVar = true;
+								if (key == identifiers[var].token)
+								{
+									std::cout << "Found predifined const int" << std::endl;
+									foundVar = true;
+								}
 							}
+							if (!foundVar)
+							{
+								std::cout << "Made new const int" << std::endl;
+								unsigned int varIndex = identifiers.size();
+								bytecode.ALLOCATEF();
+								bytecode.LOADI(varIndex, value);
+								identifiers.push_back(tsIdentifier(key, tsIdentifier::IdentType::tsInt));
+							}
+							tokens[token].token = key;
 						}
-						if (!foundVar)
+						else
+
 						{
-							std::cout << "Made new const float" << std::endl;
-							unsigned int varIndex = fVars.size();
-							bytecode.ALLOCATEF();
-							bytecode.LOADF(varIndex, value);
-							fVars.push_back(key);
+							float value = std::stof(tokens[token].token); // try to cast string to float, if it fails it is not a float
+							std::cout << "Found const float: " << value << std::endl;
+							bool foundVar = false;
+							std::string key = "const float " + std::to_string(value);
+							for (unsigned int var = 0; var < identifiers.size() && !foundVar; var++)
+							{
+								if (key == identifiers[var].token)
+								{
+									std::cout << "Found predifined const float" << std::endl;
+									foundVar = true;
+								}
+							}
+							if (!foundVar)
+							{
+								std::cout << "Made new const float" << std::endl;
+								unsigned int varIndex = identifiers.size();
+								bytecode.ALLOCATEF();
+								bytecode.LOADF(varIndex, value);
+								identifiers.push_back(tsIdentifier(key, tsIdentifier::IdentType::tsFloat));
+							}
+							tokens[token].token = key;
 						}
-						tokens[token].token = key;
 					}
 					catch (...)
 					{
+						try
+						{
+							
+						}
+						catch (...)
+						{
 
+						}
 					}
+					
 				}
 			}
+			//We signal that we are done loading with a return;
+			bytecode.RETURN();
 		}
 
 		void GetFunctionParams(size_t& i, const std::vector<tsToken>& tokens, tsFunction& function)
@@ -562,13 +742,13 @@ namespace ts
 							{
 
 								//Store how many varibles are in the parent scope
-								unsigned int fVarCount = fVars.size();
+								unsigned int fVarCount = identifiers.size();
 
 								//enter a new scope
 								std::cout << "Generating statement" << std::endl;
 								GenerateStatement(++i, tokens, bytecode);
 								//Delete the varible ids from the last scope
-								fVars.resize(fVarCount);
+								identifiers.resize(fVarCount);
 								break;
 							}
 							case GetIndexOfOperator(";"):
@@ -585,6 +765,9 @@ namespace ts
 						{
 							case GetIndexOfReservedWord("float"):
 								GenerateFloat(i, tokens, bytecode);
+								break;
+							case GetIndexOfReservedWord("int"):
+								GenerateInt(i, tokens, bytecode);
 								break;
 							case GetIndexOfReservedWord("return"):
 								GenerateReturn(i, tokens, bytecode);
@@ -620,7 +803,7 @@ namespace ts
 			for (size_t op = 0; op < operations.size(); op++)
 			{
 				std::cout << "ran get value index" << std::endl;
-				operations[op]->GetValueIndex(bytecode, 0);
+				operations[op]->getValueIndex(bytecode, 0);
 			}
 			i += end;
 			std::cout << "next token after expression: " << tokens[i].token << std::endl;
@@ -636,10 +819,13 @@ namespace ts
 				if (token.type == tsToken::Type::tsIdentifier)
 				{
 					unsigned int index;
-					if (GetIndexOfFloat(token.token, index))
+					if (GetIndexOfIdent(token.token, index))
 					{
 						std::cout << "Found var" << std::endl;
-						operations.push_back(std::make_unique<tsFloatOperation>(index));
+						if (identifiers[index].type == tsIdentifier::IdentType::tsFloat)
+							operations.push_back(std::make_unique<tsFloatOperation>(index));
+						else if (identifiers[index].type == tsIdentifier::IdentType::tsInt)
+							operations.push_back(std::make_unique<tsIntOperation>(index));
 					}
 				}
 				else if (token.type == tsToken::Type::tsOperator)
@@ -691,7 +877,7 @@ namespace ts
 							break;
 						case GetIndexOfOperator("="):
 							std::cout << "Found =" << std::endl;
-							operations.push_back(std::make_unique<tsFloatAssignOperation>());
+							operations.push_back(std::make_unique<tsAssignOperation>());
 							break;
 					}
 				}
@@ -703,13 +889,13 @@ namespace ts
 			{
 				for (unsigned int i = 0; i < operations.size(); i++)
 				{
-					if (operations[i] -> GetPriority() == priority)
+					if (operations[i] -> getPriority() == priority)
 					{
-						switch (operations[i] -> GetDepSide())
+						switch (operations[i] -> getDepSide())
 						{
 							case tsOperation::DepSide::both:
 								std::cout << "Found double sided operator at index " << i << " at priority " << priority << std::endl;
-								dynamic_cast<tsDDOperator*>(operations[i].get()) -> SetDeps(operations[i - 1], operations[i + 1]);
+								static_cast<tsDDOperator*>(operations[i].get()) -> setDeps(operations[i - 1], operations[i + 1]);
 								
 								// We need to erase these pointers as they are no longer assigned
 								// Need to erase +1 first since otherwise the index for it would be off
@@ -720,13 +906,13 @@ namespace ts
 								break;
 							case tsOperation::DepSide::right:
 								std::cout << "Found right sided operator at index " << i << " at priority " << priority << std::endl;
-								dynamic_cast<tsROperator*>(operations[i].get())->SetDep(operations[i + 1]);
+								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i + 1]);
 
 								operations.erase(operations.begin() + i + 1);
 								break;
 							case tsOperation::DepSide::left:
 								std::cout << "Found left sided operator at index " << i << " at priority " << priority << std::endl;
-								dynamic_cast<tsROperator*>(operations[i].get())->SetDep(operations[i - 1]);
+								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i - 1]);
 
 								operations.erase(operations.begin() + i - 1);
 								// Need to step back because we deleted and index before this one
@@ -739,11 +925,11 @@ namespace ts
 			
 		}
 
-		bool GetIndexOfFloat(const std::string& id, unsigned int& index)
+		bool GetIndexOfIdent(const std::string& id, unsigned int& index)
 		{
-			for (unsigned int i = 0; i < fVars.size(); i++)
+			for (unsigned int i = 0; i < identifiers.size(); i++)
 			{
-				if (fVars[i] == id)
+				if (identifiers[i].token == id)
 				{
 					index = i;
 					return true;
@@ -760,8 +946,19 @@ namespace ts
 		void GenerateFloat(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "float");
-			fVars.push_back(tokens[++i].token);
+			identifiers.push_back(tsIdentifier(tokens[++i].token, tsIdentifier::IdentType::tsFloat));
 			bytecode.ALLOCATEF();
+			if (tokens[++i].token != ";")
+				GenerateExpression(--i, tokens, bytecode);
+			else
+				++i;
+		}
+
+		void GenerateInt(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		{
+			assert(tokens[i].token == "int");
+			identifiers.push_back(tsIdentifier(tokens[++i].token, tsIdentifier::IdentType::tsFloat));
+			bytecode.ALLOCATEI();
 			if (tokens[++i].token != ";")
 				GenerateExpression(--i, tokens, bytecode);
 			else
@@ -772,7 +969,7 @@ namespace ts
 		{
 			assert(tokens[i].token == "return");
 			GenerateExpression(++i, tokens, bytecode);
-			bytecode.RETURNF();
+			bytecode.RETURN();
 		}
 
 		void GenerateStruct(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)

@@ -1,8 +1,10 @@
 #include <iostream>
+#include <fstream>
 #include "ThunderScript.h"
 #include "ThunderScriptCompiler.h"
 #include <string>
 #include "massert.h"
+#include "TSBytecodeDebugger.h";
 
 int main()
 {
@@ -22,20 +24,19 @@ int main()
 			std::cout << "Sucessfully read file!" << std::endl;
 
 			ts::tsBytecode bytecode = tsc->scripts[0].functions[0].bytecode;
-			for (size_t i = 0; i < bytecode.bytes.size(); i++)
-			{
-				std::cout << (int)bytecode.bytes[i] << std::endl;
-			}
+			
+			ts::DisplayBytecode(bytecode);
 
-			std::cout << "Do you want to run it? (y/n): ";
 			char input;
+			std::cout << "Do you want to run it? (y/n): ";
 			std::cin >> input;
 			if (input == 'y')
 			{
 				std::cout << "Running script:\n\n";
 				ts::tsRuntime runtime(tsc);
 
-				runtime.RunScript(tsc -> scripts[0]);
+				runtime.LoadScript(0);
+				runtime.Run();
 			}
 		}
 		else
