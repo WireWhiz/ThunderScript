@@ -1,10 +1,8 @@
 // this is a comment
 
-# this is a preprocessor
+#in float a
+#in float b
+#ref float r
 
-def main()
-{
-    int i = 5;
-    float testFloat = 1 / -2 + (30.5 + 2) + i;
-    return testFloat;
-}
+r = a + (b + 1);
+end;

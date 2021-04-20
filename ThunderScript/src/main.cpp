@@ -23,7 +23,7 @@ int main()
 		{
 			std::cout << "Sucessfully read file!" << std::endl;
 
-			ts::tsBytecode bytecode = tsc->scripts[0].functions[0].bytecode;
+			ts::tsBytecode bytecode = tsc->scripts[0].bytecode;
 			
 			ts::DisplayBytecode(bytecode);
 
@@ -36,7 +36,10 @@ int main()
 				ts::tsRuntime runtime(tsc);
 
 				runtime.LoadScript(0);
+				runtime.SetGlobal<float>("a", 2);
+				runtime.SetGlobal<float>("b", 3);
 				runtime.Run();
+				std::cout << "Global r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
 			}
 		}
 		else
