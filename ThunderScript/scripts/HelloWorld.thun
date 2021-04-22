@@ -4,5 +4,13 @@
 #in float b
 #ref float r
 
+/*
+
+Test comment to  make sure the line that the errors 
+report is correct
+
+*/
+
 r = a + (b + 1);
+bool testBool = true;
 end;

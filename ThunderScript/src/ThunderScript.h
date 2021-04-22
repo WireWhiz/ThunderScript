@@ -36,8 +36,24 @@ namespace ts
 	{
 		tsUnknown,
 		tsInt,
-		tsFloat
+		tsFloat,
+		tsBool
 	};
+
+	constexpr std::string_view getValueTypeName(ValueType type)
+	{
+		switch (type)
+		{
+			case ValueType::tsFloat:
+				return "float";
+			case ValueType::tsInt:
+				return "int";
+			case ValueType::tsBool:
+				return "bool";
+			default:
+				return "Unknown type";
+		}
+	}
 
 	class tsBytes
 	{
@@ -48,6 +64,7 @@ namespace ts
 		void pushBack(T value)//, unsigned int index)
 		{
 			size_t index = bytes.size();
+
 			bytes.resize(bytes.size() + sizeof(T), std::byte(0));
 			std::memcpy(&bytes[index], &value, sizeof(T));
 		}
@@ -347,7 +364,9 @@ namespace ts
 						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
 						cursor += 3;
 						stack.copy(index2, index1, 4);
-						std::cout << "Value of moved float(?): " << stack.read<float>(index1) << std::endl;
+						std::cout << "Value of moved float: " << stack.read<float>(index1) << std::endl;
+						std::cout << "Value of moved int: " << stack.read<int>(index1) << std::endl;
+						std::cout << "Value of moved bool: " << stack.read<bool>(index1) << std::endl;
 					}
 						break;
 					case tsFtoI:

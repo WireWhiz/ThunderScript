@@ -18,34 +18,41 @@ int main()
 		if (filePath == "exit")
 			break;
 		std::shared_ptr<ts::tsContext> tsc = std::make_shared<ts::tsContext>();
-		
-		if (compiler.compile(filePath, tsc))
+		try
 		{
-			std::cout << "Sucessfully read file!" << std::endl;
-
-			ts::tsBytecode bytecode = tsc->scripts[0].bytecode;
-			
-			ts::DisplayBytecode(bytecode);
-
-			char input;
-			std::cout << "Do you want to run it? (y/n): ";
-			std::cin >> input;
-			if (input == 'y')
+			if (compiler.compile(filePath, tsc))
 			{
-				std::cout << "Running script:\n\n";
-				ts::tsRuntime runtime(tsc);
+				std::cout << "Sucessfully read file!" << std::endl;
 
-				runtime.LoadScript(0);
-				runtime.SetGlobal<float>("a", 2);
-				runtime.SetGlobal<float>("b", 3);
-				runtime.Run();
-				std::cout << "Global r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
+				ts::tsBytecode bytecode = tsc->scripts[0].bytecode;
+
+				ts::DisplayBytecode(bytecode);
+
+				char input;
+				std::cout << "Do you want to run it? (y/n): ";
+				std::cin >> input;
+				if (input == 'y')
+				{
+					std::cout << "Running script:\n\n";
+					ts::tsRuntime runtime(tsc);
+
+					runtime.LoadScript(0);
+					runtime.SetGlobal<float>("a", 2);
+					runtime.SetGlobal<float>("b", 3);
+					runtime.Run();
+					std::cout << "Global r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
+				}
+			}
+			else
+			{
+				std::cout << "Could not find file." << std::endl;
 			}
 		}
-		else
+		catch (ts::tsCompileError error)
 		{
-			std::cout << "Could not find file." << std::endl;
+			error.display();
 		}
+		
 
 	}
 	return 0;
