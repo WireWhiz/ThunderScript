@@ -20,16 +20,18 @@ namespace ts
 	#define tsItoF      std::byte(1) // cast an int to a float 
 	#define tsFtoI      std::byte(2) // cast a float to an int
 	#define tsLOAD      std::byte(3) // load bytes from code into memory
-	#define tsMOVE      std::byte(4) // copy a float from one index to another
-	#define tsFLIPF     std::byte(5) // store opeator var in float
-	#define tsADDF      std::byte(6) // add operator vars and store in one of them
+	#define tsMOVE      std::byte(4) // copy a set of bytes from one index to another
+	#define tsFLIPF     std::byte(5) // flip a float
+	#define tsADDF      std::byte(6) // add a float
 	#define tsMULF      std::byte(7) // multiply a float
 	#define tsDIVF      std::byte(8) // divide a float
-	#define tsMOVEI     std::byte(9) // load float from bytecode into var
-	#define tsFLIPI     std::byte(10) // store opeator var in float
-	#define tsADDI      std::byte(11) // add operator vars and store in one of them
-	#define tsMULI      std::byte(12) // multiply a float
-	#define tsDIVI      std::byte(13) // divide a float
+	#define tsFLIPI     std::byte(9) // flip and int
+	#define tsADDI      std::byte(10) // add an int
+	#define tsMULI      std::byte(11) // multiply an int
+	#define tsDIVI      std::byte(12) // divide a float
+	#define tsNOT       std::byte(13) // invert a bool
+	#define tsAND       std::byte(14) // and operation on two bools
+	#define tsOR        std::byte(15) // or operation on two bools
 	
 
 	enum class ValueType
@@ -363,7 +365,7 @@ namespace ts
 						cursor += 4;
 						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
 						cursor += 3;
-						stack.copy(index2, index1, 4);
+						stack.copy(index2, index1, size);
 						std::cout << "Value of moved float: " << stack.read<float>(index1) << std::endl;
 						std::cout << "Value of moved int: " << stack.read<int>(index1) << std::endl;
 						std::cout << "Value of moved bool: " << stack.read<bool>(index1) << std::endl;

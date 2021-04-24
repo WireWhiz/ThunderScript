@@ -11,6 +11,6 @@ report is correct
 
 */
 
-r = a + (b + 1);
+r = a + (b + 1) + 243;
 bool testBool = true;
 end;

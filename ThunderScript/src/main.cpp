@@ -40,7 +40,7 @@ int main()
 					runtime.SetGlobal<float>("a", 2);
 					runtime.SetGlobal<float>("b", 3);
 					runtime.Run();
-					std::cout << "Global r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
+					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
 				}
 			}
 			else

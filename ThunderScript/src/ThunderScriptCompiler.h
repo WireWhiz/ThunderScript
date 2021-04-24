@@ -590,11 +590,9 @@ namespace ts
 			}
 			void setDeps(std::unique_ptr<tsOperation>& dep1, std::unique_ptr<tsOperation>& dep2)
 			{
-				std::cout << "Input deps null: " << (dep1.get() == nullptr) << " and " << (dep1.get() == nullptr) << std::endl;
 				massert((dep1.get() != nullptr) && (dep2.get() != nullptr), "Input pointer(s) were null")
 					_dep1 = std::move(dep1);
 				_dep2 = std::move(dep2);
-				std::cout << "Deps null: " << (_dep1.get() == nullptr) << " and " << (_dep2.get() == nullptr) << std::endl;
 			}
 		};
 
@@ -619,11 +617,11 @@ namespace ts
 			}
 		};
 
-		class tsIntOperation : public tsOperation
+		class tsVarOperation : public tsOperation
 		{
 		public:
 			tsVar _var;
-			tsIntOperation(tsVar& var)
+			tsVarOperation(tsVar& var)
 			{
 				_var = var;
 			}
@@ -637,41 +635,6 @@ namespace ts
 			}
 		};
 
-		class tsFloatOperation : public tsOperation
-		{
-		public:
-			tsVar _var;
-			tsFloatOperation(tsVar var)
-			{
-				_var = var;
-			}
-			unsigned int getPriority()
-			{
-				return 1;
-			}
-			tsVar getValue(tsBytecode& bytecode, tsVarPool& vars)
-			{
-				return _var;
-			}
-		};
-
-		class tsBoolOperation : public tsOperation
-		{
-		public:
-			tsVar _var;
-			tsBoolOperation(tsVar var)
-			{
-				_var = var;
-			}
-			unsigned int getPriority()
-			{
-				return 1;
-			}
-			tsVar getValue(tsBytecode& bytecode, tsVarPool& vars)
-			{
-				return _var;
-			}
-		};
 
 		class tsAssignOperation : public tsDDOperator
 		{
@@ -1164,22 +1127,8 @@ namespace ts
 					tsVar var;
 					if (vars.getIndexOfIdentifier(token.token, var))
 					{
-						switch (var.type)
-						{
-							case ValueType::tsInt:
-								operations.push_back(std::make_unique<tsFloatOperation>(var));
-								break;
-							case ValueType::tsFloat:
-								operations.push_back(std::make_unique<tsIntOperation>(var));
-								break;
-							case ValueType::tsBool:
-								operations.push_back(std::make_unique<tsBoolOperation>(var));
-								break;
-							default:
-								massert(false, "Unimplemented var type: " + std::to_string((int)var.type))
-								break;
-						}
-
+						std::cout << "found var: " << var.identifier << std::endl;
+						operations.push_back(std::make_unique<tsVarOperation>(var));
 					}
 				}
 				else if (token.type == tsToken::Type::tsOperator)
@@ -1189,6 +1138,8 @@ namespace ts
 					{
 						case GetIndexOfOperator("("):
 						{
+							std::cout << "Found scoped operators: ";
+
 							int pCount = 1;
 							std::vector<tsToken> subTokens;
 							i++;
@@ -1198,33 +1149,46 @@ namespace ts
 									pCount++;
 								else if (tokens[i].token == ")")
 									pCount--;
+
 								if (pCount > 0)
 								{
 									subTokens.push_back(tokens[i]);
+									std::cout << tokens[i].token;
+									i++;
 								}
-								i++;
+								
 							}
+							std::cout << std::endl;
 							std::unique_ptr<tsScopeOperation> subExpression = std::make_unique<tsScopeOperation>();
 							GenerateOperations(subTokens, subExpression->Operations());
 							operations.push_back(std::move(subExpression));
 						}
 							break;
 						case GetIndexOfOperator("+"):
+							std::cout << "Found +" << std::endl;
 							operations.push_back(std::make_unique<tsAddOperation>());
 							break;
 						case GetIndexOfOperator("-"):
+							std::cout << "Found -" << std::endl;
+
 							if(i == 0 || (tokens[i - 1].type == tsToken::Type::tsOperator && tokens[i - 1].token != ")"))
 								operations.push_back(std::make_unique<tsNegateOperation>());
 							else
 								operations.push_back(std::make_unique<tsSubtractOperation>());
 							break;
 						case GetIndexOfOperator("*"):
+							std::cout << "Found *" << std::endl;
+
 							operations.push_back(std::make_unique<tsMultiplyOperation>());
 							break;
 						case GetIndexOfOperator("/"):
+							std::cout << "Found /" << std::endl;
+
 							operations.push_back(std::make_unique<tsDivideOperation>());
 							break;
 						case GetIndexOfOperator("="):
+							std::cout << "Found =" << std::endl;
+
 							operations.push_back(std::make_unique<tsAssignOperation>());
 							break;
 						default:
@@ -1248,6 +1212,8 @@ namespace ts
 						switch (operations[i] -> getDepSide())
 						{
 							case tsOperation::DepSide::both:
+								std::cout << "Found double sided operator" << std::endl;
+
 								static_cast<tsDDOperator*>(operations[i].get()) -> setDeps(operations[i - 1], operations[i + 1]);
 								
 								// We need to erase these pointers as they are no longer assigned
@@ -1258,11 +1224,15 @@ namespace ts
 								i--;
 								break;
 							case tsOperation::DepSide::right:
+								std::cout << "Found right sided operator" << std::endl;
+
 								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i + 1]);
 
 								operations.erase(operations.begin() + i + 1);
 								break;
 							case tsOperation::DepSide::left:
+								std::cout << "Found left sided operator" << std::endl;
+
 								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i - 1]);
 
 								operations.erase(operations.begin() + i - 1);
