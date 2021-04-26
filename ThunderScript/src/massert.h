@@ -5,8 +5,8 @@
 
 #ifdef NDEBUG
 
-#define assert(expression) ((void)0)
-
+#define assert(expression) 
+#define massert(expression, message) 
 #else
 class assertException : public std::exception
 {

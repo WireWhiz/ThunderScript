@@ -3,6 +3,7 @@
 #include "ThunderScript.h"
 #include "ThunderScriptCompiler.h"
 #include <string>
+#include <chrono>
 #include "massert.h"
 #include "TSBytecodeDebugger.h";
 
@@ -39,8 +40,13 @@ int main()
 					runtime.LoadScript(0);
 					runtime.SetGlobal<float>("a", 2);
 					runtime.SetGlobal<float>("b", 3);
+					auto start = std::chrono::high_resolution_clock::now();
 					runtime.Run();
-					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
+					auto stop = std::chrono::high_resolution_clock::now();
+					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<int>("r") << std::endl;
+					std::cout << "Global testBool has a value of: " << runtime.GetGlobal<bool>("testBool") << std::endl;
+					std::cout << "Program took: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()
+						<< " microseconds" << std::endl;
 				}
 			}
 			else
