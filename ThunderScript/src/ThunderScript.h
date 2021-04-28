@@ -591,9 +591,12 @@ namespace ts
 					break;
 					default:
 					{
-						//massert(false, "Unknown byte code! " + std::to_string((unsigned int)bytecode.bytes.read<std::byte>(cursor)));
+					#ifdef _DEBUG
+						massert(false, "Unknown byte code! " + std::to_string((unsigned int)bytecode.bytes.read<std::byte>(cursor)));
+					#else
+						//This apperently removes the default check from the switch, increasing speed
 						__assume(false);
-						//break;
+					#endif
 					}
 				}
 				++cursor;
