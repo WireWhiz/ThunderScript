@@ -43,7 +43,7 @@ int main()
 					auto start = std::chrono::high_resolution_clock::now();
 					runtime.Run();
 					auto stop = std::chrono::high_resolution_clock::now();
-					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<int>("r") << std::endl;
+					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
 					std::cout << "Global testBool has a value of: " << runtime.GetGlobal<bool>("testBool") << std::endl;
 					std::cout << "Program took: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()
 						<< " microseconds" << std::endl;

@@ -2,7 +2,7 @@
 
 #in float a
 #in float b
-#ref int r
+#ref float r
 #ref bool testBool
 
 /*
@@ -13,9 +13,11 @@ report is correct
 */
 
 r = 0;
-int limit = 2000000000;
-int addition = 1;
-while (r < limit){
-	r = r + addition;
-}
-end;
+float lastValue = 0;
+float limit = 2000000000;
+while (!testBool){
+	r = r + 1;
+	if(lastValue == r)
+		testBool = true;
+	lastValue = r;
+} 

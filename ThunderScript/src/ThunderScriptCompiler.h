@@ -194,10 +194,13 @@ namespace ts
 		}
 
 		template<ValueType T>
-		tsVar cast(tsBytecode& bytecode, tsVar& var)
+		tsVar cast(tsBytecode& bytecode, tsVar& var, const size_t& line)
 		{
 			if (var.type == T)
 				return var;
+
+			if (var.type == ValueType::tsUnknown)
+				throw tsCompileError("Can not cast varible of unknown type to " + (std::string)getValueTypeName(T), line);
 
 			std::cout << "casing" << std::endl;
 			tsVar newVar = requestTempVar(T);
@@ -668,11 +671,11 @@ namespace ts
 				switch (a.type)
 				{
 					case ValueType::tsFloat:
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsMOVE, sizeof(float), b.index, a.index);
 						break;
 					case ValueType::tsInt:
-						b = vars.cast<ValueType::tsInt>(bytecode, b);
+						b = vars.cast<ValueType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsMOVE, sizeof(int), b.index, a.index);
 						break;
 					case ValueType::tsBool:
@@ -683,6 +686,7 @@ namespace ts
 					default:
 						throw tsCompileError("Can not assign type " + static_cast<std::string>(getValueTypeName(b.type)) + " to " + static_cast<std::string>(getValueTypeName(a.type)), line);
 				}
+				a.type = ValueType::tsUnknown;
 				return a;
 			}
 		};
@@ -712,15 +716,17 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsADDF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
-						a = vars.cast<ValueType::tsInt>(bytecode, a);
-						b = vars.cast<ValueType::tsInt>(bytecode, b);
+						a = vars.cast<ValueType::tsInt>(bytecode, a, line);
+						b = vars.cast<ValueType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
+					default:
+						throw tsCompileError("Invalid type for add operation", line);
 				}
 				return result;
 			}
@@ -783,19 +789,19 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsFLIPF, b.index, b.index);
 						bytecode.pushCmd(tsADDF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
-						a = vars.cast<ValueType::tsInt>(bytecode, a);
-						b = vars.cast<ValueType::tsInt>(bytecode, b);
+						a = vars.cast<ValueType::tsInt>(bytecode, a, line);
+						b = vars.cast<ValueType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsFLIPI, b.index, b.index);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
 					default:
-						throw tsCompileError("Invalid type for add operation.", line);
+						throw tsCompileError("Invalid type for subtract operation.", line);
 				}
 				return result;
 			}
@@ -825,13 +831,13 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsMULF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
-						a = vars.cast<ValueType::tsInt>(bytecode, a);
-						b = vars.cast<ValueType::tsInt>(bytecode, b);
+						a = vars.cast<ValueType::tsInt>(bytecode, a, line);
+						b = vars.cast<ValueType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsMULI, a.index, b.index, result.index);
 						break;
 					default:
@@ -866,13 +872,13 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsADDF,a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
-						a = vars.cast<ValueType::tsInt>(bytecode, a);
-						b = vars.cast<ValueType::tsInt>(bytecode, b);
+						a = vars.cast<ValueType::tsInt>(bytecode, a, line);
+						b = vars.cast<ValueType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
 					default:
@@ -979,7 +985,7 @@ namespace ts
 
 			tsVar getValue(tsBytecode& bytecode, tsVarPool& vars)
 			{
-				std::cout << "Getting value of divide operation" << std::endl;
+				std::cout << "Getting value of equal operation" << std::endl;
 				massert((_dep1.get() != nullptr) && (_dep2.get() != nullptr), "Dependancy pointer(s) were null " + std::to_string(_dep1.get() != nullptr) + " " + std::to_string(_dep2.get() != nullptr));
 				vars.enterScope();
 				tsVar a = _dep1->getValue(bytecode, vars);
@@ -1003,12 +1009,12 @@ namespace ts
 					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(type);
+				tsVar result = vars.requestTempVar(ValueType::tsBool);
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsEqualF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
@@ -1056,8 +1062,8 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
@@ -1103,8 +1109,8 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessF, b.index, a.index, result.index);
 						break;
 					case ValueType::tsInt:
@@ -1150,8 +1156,8 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessEqualF, a.index, b.index, result.index);
 						break;
 					case ValueType::tsInt:
@@ -1197,8 +1203,8 @@ namespace ts
 				switch (type)
 				{
 					case ValueType::tsFloat:
-						a = vars.cast<ValueType::tsFloat>(bytecode, a);
-						b = vars.cast<ValueType::tsFloat>(bytecode, b);
+						a = vars.cast<ValueType::tsFloat>(bytecode, a, line);
+						b = vars.cast<ValueType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessEqualF, b.index, a.index, result.index);
 						break;
 					case ValueType::tsInt:
@@ -1366,69 +1372,73 @@ namespace ts
 		*/
 		void GenerateStatement(size_t& i, const std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
-			while (i < tokens.size() && tokens[i].token != "}")
+			
+			line = tokens[i].line;
+			switch (tokens[i].type)
 			{
-				line = tokens[i].line;
-				switch (tokens[i].type)
-				{
-					case tsToken::Type::tsOperator:
-						switch (tokens[i].tokenIndex)
+				case tsToken::Type::tsOperator:
+					switch (tokens[i].tokenIndex)
+					{
+						case GetIndexOfOperator("{"):
 						{
-							case GetIndexOfOperator("{"):
+
+							//Store how many varibles are in the parent scope
+							vars.enterScope();
+
+							//enter a new scope
+							std::cout << "Generating {} statement" << std::endl;
+							size_t startLine = line;
+							i++;
+							while (tokens[i].token != "}")
 							{
-
-								//Store how many varibles are in the parent scope
-								vars.enterScope();
-
-								//enter a new scope
-								std::cout << "Generating statement" << std::endl;
-								GenerateStatement(++i, tokens, bytecode);
-								//Delete the varible ids from the last scope
-								vars.exitScope();
-								break;
+								GenerateStatement(i, tokens, bytecode);
+								if (++i == tokens.size())
+									throw tsCompileError("Was expecting closing }", startLine);
 							}
-							case GetIndexOfOperator(";"):
-								break;
-							default:
-								massert(false, "Unknown statement operator: " + tokens[i].token);
-								//GenerateExpression(0, i, tokens, bytecode);
-								break;
+							//Delete the varible ids from the last scope
+							vars.exitScope();
+							break;
 						}
-						break;
+						case GetIndexOfOperator(";"):
+							break;
+						default:
+							massert(false, "Unknown statement operator: " + tokens[i].token);
+							//GenerateExpression(0, i, tokens, bytecode);
+							break;
+					}
+					break;
 						
-					case tsToken::Type::tsReservedWord:
-						switch (tokens[i].tokenIndex)
-						{
-							case GetIndexOfReservedWord("float"):
-								GenerateFloat(i, tokens, bytecode);
-								break;
-							case GetIndexOfReservedWord("int"):
-								GenerateInt(i, tokens, bytecode);
-								break;
-							case GetIndexOfReservedWord("bool"):
-								GenerateBool(i, tokens, bytecode);
-								break;
-							case GetIndexOfReservedWord("end"):
-								GenerateEnd(i, tokens, bytecode);
-								break;
-							case GetIndexOfReservedWord("if"):
-								GenerateIf(i, tokens, bytecode);
-								break;
-							case GetIndexOfReservedWord("while"):
-								GenerateWhile(i, tokens, bytecode);
-								break;
-							default:
-								throw tsCompileError("Unknown reserved word: " + tokens[i].token, line);
-								//GenerateExpression
-								break;
-						}
-						break;
+				case tsToken::Type::tsReservedWord:
+					switch (tokens[i].tokenIndex)
+					{
+						case GetIndexOfReservedWord("float"):
+							GenerateVar(ValueType::tsFloat, i, tokens, bytecode);
+							break;
+						case GetIndexOfReservedWord("int"):
+							GenerateVar(ValueType::tsInt, i, tokens, bytecode);
+							break;
+						case GetIndexOfReservedWord("bool"):
+							GenerateVar(ValueType::tsBool, i, tokens, bytecode);
+							break;
+						case GetIndexOfReservedWord("end"):
+							GenerateEnd(i, tokens, bytecode);
+							break;
+						case GetIndexOfReservedWord("if"):
+							GenerateIf(i, tokens, bytecode);
+							break;
+						case GetIndexOfReservedWord("while"):
+							GenerateWhile(i, tokens, bytecode);
+							break;
+						default:
+							throw tsCompileError("Unknown reserved word: " + tokens[i].token, line);
+							//GenerateExpression
+							break;
+					}
+					break;
 						
-					default:
-						GenerateExpression(i, tokens, bytecode);
-						break;
-				}
-				++i;
+				default:
+					GenerateExpression(i, tokens, bytecode);
+					break;
 			}
 			
 			
@@ -1438,7 +1448,12 @@ namespace ts
 		{
 			std::unique_ptr<tsOperation> operation;
 			size_t end = 0;
-			while (tokens[i + end].token != ";") ++end;
+			while (tokens[i + end].token != ";")
+			{
+				++end;
+				if (tokens.size() <= i + end)
+					throw tsCompileError("Expected ; but file ended", tokens[i + end - 1].line);
+			}
 			std::vector opTokens(tokens.begin() + i, tokens.begin() + i + end);
 			std::cout << "Expression: ";
 			for (size_t j = 0; j < opTokens.size(); j++)
@@ -1459,6 +1474,7 @@ namespace ts
 		void GenerateOperation(const std::vector<tsToken>& tokens, std::unique_ptr<tsOperation>& operation)
 		{
 			std::vector<std::unique_ptr<tsOperation>> operations;
+			
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
 				tsToken token = tokens[i];
@@ -1471,6 +1487,8 @@ namespace ts
 						std::cout << "found var: " << var.identifier << std::endl;
 						operations.push_back(std::make_unique<tsVarOperation>(var));
 					}
+					else
+						throw tsCompileError("Unknown Identifier: " + token.token ,line);
 				}
 				else if (token.type == tsToken::Type::tsOperator)
 				{
@@ -1486,6 +1504,8 @@ namespace ts
 							i++;
 							while (pCount > 0)
 							{
+								if (i >= tokens.size())
+									throw tsCompileError("Expected closing )", line);
 								if (tokens[i].token == "(")
 									pCount++;
 								else if (tokens[i].token == ")")
@@ -1569,7 +1589,7 @@ namespace ts
 					}
 				}
 				else
-					throw tsCompileError("Unknown expression reserved word: " + tokens[i].token, line);
+					throw tsCompileError("Unexpected reserved word in expression: " + tokens[i].token, line);
 				if (operations.size() > 0)
 				{
 					std::cout << "operations size: " << operations.size() << std::endl;
@@ -1589,6 +1609,11 @@ namespace ts
 							case tsOperation::DepSide::both:
 								std::cout << "Found double sided operator" << std::endl;
 
+								if (0 > i - 1)
+									throw tsCompileError("Value for left side of operator not found", line);
+								if (operations.size() <= i + 1)
+									throw tsCompileError("Value for right side of operator not found", line);
+
 								static_cast<tsDDOperator*>(operations[i].get()) -> setDeps(operations[i - 1], operations[i + 1]);
 								
 								// We need to erase these pointers as they are no longer assigned
@@ -1601,12 +1626,18 @@ namespace ts
 							case tsOperation::DepSide::right:
 								std::cout << "Found right sided operator" << std::endl;
 
+								if (operations.size() <= i + 1)
+									throw tsCompileError("Value for right side of operator not found", line);
+
 								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i + 1]);
 
 								operations.erase(operations.begin() + i + 1);
 								break;
 							case tsOperation::DepSide::left:
 								std::cout << "Found left sided operator" << std::endl;
+
+								if (0 > i - 1)
+									throw tsCompileError("Value for left side of operator not found", line);
 
 								static_cast<tsROperator*>(operations[i].get())->setDep(operations[i - 1]);
 
@@ -1618,6 +1649,8 @@ namespace ts
 					}
 				}
 			}
+			if (operations.size() != 1)
+				throw tsCompileError("Unable to evalulate expression", line);
 			operation = std::move(operations[0]);
 		}
 
@@ -1629,15 +1662,21 @@ namespace ts
 		void GenerateIf(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "if");
-			if (tokens[++i].token != "(")
+			if (++i >= tokens.size())
+				throw tsCompileError("Expected statment after if", tokens[i - 1].line);
+			if (tokens[i].token != "(")
 				throw tsCompileError("Expected \"(\" after if.", tokens[i].line);
 
+			line = tokens[i].line;
 			++i;
 			int pCount = 1;
 			std::vector<tsToken> subTokens;
 			std::cout << "If condition: ";
 			while (pCount > 0)
 			{
+
+				if (i >= tokens.size())
+					throw tsCompileError("Expected closing )", line);
 				if (tokens[i].token == "(")
 					pCount++;
 				else if (tokens[i].token == ")")
@@ -1668,15 +1707,20 @@ namespace ts
 		void GenerateWhile(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			assert(tokens[i].token == "while");
-			if (tokens[++i].token != "(")
+			if (++i >= tokens.size())
+				throw tsCompileError("Expected statment after while", tokens[i - 1].line);
+			if (tokens[i].token != "(")
 				throw tsCompileError("Expected \"(\" after if.", tokens[i].line);
-
+			line = tokens[i].line;
 			++i;
 			int pCount = 1;
 			std::vector<tsToken> subTokens;
 			std::cout << "While condition: ";
 			while (pCount > 0)
 			{
+
+				if (i >= tokens.size())
+					throw tsCompileError("Expected closing )", line);
 				if (tokens[i].token == "(")
 					pCount++;
 				else if (tokens[i].token == ")")
@@ -1702,7 +1746,7 @@ namespace ts
 				throw tsCompileError("condition of if statment must be initalized", line);
 
 			size_t endIndex = bytecode.JUMPF(condition.index);
-			i += 2;
+			i ++;
 			GenerateStatement(i, tokens, bytecode);
 			
 			bytecode.GOTO(startIndex);
@@ -1718,31 +1762,14 @@ namespace ts
 			*/
 		}
 		
-		void GenerateBool(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		void GenerateVar(ValueType type, size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
-			assert(tokens[i].token == "bool");
-			vars.requestVar(ValueType::tsBool, tokens[++i].token, false);
-			if (tokens[++i].token != ";")
-				GenerateExpression(--i, tokens, bytecode);
-			else
-				++i;
-		}
-
-		void GenerateFloat(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
-		{
-			assert(tokens[i].token == "float");
-			vars.requestVar(ValueType::tsFloat, tokens[++i].token, false);
-			if (tokens[++i].token != ";")
-				GenerateExpression(--i, tokens, bytecode);
-			else
-				++i;
-		}
-
-		void GenerateInt(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
-		{
-			assert(tokens[i].token == "int");
-			vars.requestVar(ValueType::tsInt, tokens[++i].token, false);
-			if (tokens[++i].token != ";")
+			if (tokens.size() <= ++i)
+				throw tsCompileError("Was expecting identifier", line);
+			vars.requestVar(type, tokens[i].token, false);
+			if (tokens.size() <= ++i)
+				throw tsCompileError("Was expecting ; or expression after variable declaration", line);
+			if (tokens[i].token != ";")
 				GenerateExpression(--i, tokens, bytecode);
 			else
 				++i;
