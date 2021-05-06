@@ -1,30 +1,36 @@
 #include <iostream>
-#include <fstream>
-#include "ThunderScript.h"
-#include "ThunderScriptCompiler.h"
 #include <string>
 #include <chrono>
-#include "massert.h"
+#include <sstream>
+#include "tsMassert.h"
+#include "ThunderScript.h"
+#include "ThunderScriptCompiler.h"
 #include "TSBytecodeDebugger.h";
+
+
 
 int main()
 {
 	std::cout << "ThunderScript Compiler Version: " << ts::tsVersion <<std::endl;
-	ts::tsCompiler compiler;
-	while (true)
+
+	//while (true)
 	{
-		std::cout << "Please enter a file path: ";
-		std::string filePath;
-		std::cin >> filePath;
-		if (filePath == "exit")
-			break;
+		//std::cout << "Please enter a file path: ";
+		std::string filePath = "scripts/HelloWorld.thun";
+		//std::cin >> filePath;
+		//if (filePath == "exit")
+			//break;
+
+
 		std::shared_ptr<ts::tsContext> tsc = std::make_shared<ts::tsContext>();
 		try
 		{
-			if (compiler.compile(filePath, tsc))
+
+			ts::tsCompiler compiler(tsc);
+			if (compiler.compileFile(filePath))
 			{
 				std::cout << "Sucessfully read file!" << std::endl;
-
+				return 0;
 				ts::tsBytecode bytecode = tsc->scripts[0].bytecode;
 
 				ts::DisplayBytecode(bytecode);
@@ -36,22 +42,22 @@ int main()
 				{
 					std::cout << "Running script:\n\n";
 					ts::tsRuntime runtime(tsc);
-
+					
 					runtime.LoadScript(0);
-					runtime.SetGlobal<float>("a", 2);
-					runtime.SetGlobal<float>("b", 3);
+					runtime.SetGlobal<ts::tsFloat>("a", 2);
+					runtime.SetGlobal<ts::tsFloat>("b", 3);
 					auto start = std::chrono::high_resolution_clock::now();
 					runtime.Run();
 					auto stop = std::chrono::high_resolution_clock::now();
-					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<float>("r") << std::endl;
-					std::cout << "Global testBool has a value of: " << runtime.GetGlobal<bool>("testBool") << std::endl;
+					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<ts::tsInt>("r") << std::endl;
+					std::cout << "Global testBool has a value of: " << runtime.GetGlobal<ts::tsBool>("testBool") << std::endl;
 					std::cout << "Program took: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()
 						<< " microseconds" << std::endl;
 				}
 			}
 			else
 			{
-				std::cout << "Could not find file." << std::endl;
+				std::cout << "Could not read file." << std::endl;
 			}
 		}
 		catch (ts::tsCompileError error)

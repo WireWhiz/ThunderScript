@@ -8,7 +8,7 @@
 #include <stack>
 #include <any>
 #include <memory>
-#include "massert.h"
+#include "tsMassert.h"
 
 namespace ts
 {
@@ -16,35 +16,42 @@ namespace ts
 
 	//bytecode commands:
 
-	#define tsEND       std::byte(0) // return values
-	#define tsJUMP      std::byte(1) // goto a command index
-	#define tsJUMPF		std::byte(2) // if a bool is false, goto an index
-	#define tsItoF      std::byte(3) // cast an int to a float  
-	#define tsFtoI      std::byte(4) // cast a float to an int
-	#define tsLOAD      std::byte(5) // load bytes from code into memory
-	#define tsMOVE      std::byte(6) // copy a set of bytes from one index to another
-	#define tsFLIPI     std::byte(7) // flip an int
-	#define tsADDI      std::byte(8) // add an int
-	#define tsMULI      std::byte(9) // multiply an int
-	#define tsDIVI      std::byte(10) // divide an int
-	#define tsFLIPF     std::byte(11) // flip a float
-	#define tsADDF      std::byte(12) // add a float
-	#define tsMULF      std::byte(13) // multiply a float
-	#define tsDIVF      std::byte(14) // divide a float
-	#define tsNOT       std::byte(15) // invert a bool
-	#define tsAND       std::byte(16) // and operation on two bools
-	#define tsOR        std::byte(17) // or operation on two bools
-	#define tsLessI     std::byte(18) // float less then operation
-	#define tsLessF     std::byte(19) // int less then operation
-	#define tsLessEqualI std::byte(20) // float less then or equal to operation
-	#define tsLessEqualF std::byte(21) // int less then or equal to operation
-	#define tsEqualI    std::byte(22) // Compare ints
-	#define tsEqualF    std::byte(23) // Compare ints
-	#define tsEqualB    std::byte(24) // XAND 
+	#define tsEND        (tsByte)(0) // return values
+	#define tsJUMP       (tsByte)(1) // goto a command index
+	#define tsJUMPF		 (tsByte)(2) // if a bool is false, goto an index
+	#define tsItoF       (tsByte)(3) // cast an int to a float  
+	#define tsFtoI       (tsByte)(4) // cast a float to an int
+	#define tsLOAD       (tsByte)(5) // load bytes from code into memory
+	#define tsMOVE       (tsByte)(6) // copy a set of bytes from one index to another
+	#define tsFLIPI      (tsByte)(7) // flip an int
+	#define tsADDI       (tsByte)(8) // add an int
+	#define tsMULI       (tsByte)(9) // multiply an int
+	#define tsDIVI       (tsByte)(10) // divide an int
+	#define tsFLIPF      (tsByte)(11) // flip a float
+	#define tsADDF       (tsByte)(12) // add a float
+	#define tsMULF       (tsByte)(13) // multiply a float
+	#define tsDIVF       (tsByte)(14) // divide a float
+	#define tsNOT        (tsByte)(15) // invert a bool
+	#define tsAND        (tsByte)(16) // and operation on two bools
+	#define tsOR         (tsByte)(17) // or operation on two bools
+	#define tsLessI      (tsByte)(18) // float less then operation
+	#define tsLessF      (tsByte)(19) // int less then operation
+	#define tsLessEqualI (tsByte)(20) // float less then or equal to operation
+	#define tsLessEqualF (tsByte)(21) // int less then or equal to operation
+	#define tsEqualI     (tsByte)(22) // Compare ints
+	#define tsEqualF     (tsByte)(23) // Compare ints
+	#define tsEqualB     (tsByte)(24) // XAND 
 
+	// Define types for all types used by runtime, so they can be changed if needed, 
+	// espesially if diferent platforms have different varible sizes that could break the bytecode.
+	typedef unsigned int tsIndex;
+	typedef std::byte tsByte;
+	typedef std::int32_t tsInt;
+	typedef float tsFloat;
+	typedef bool tsBool;
 	
 
-	enum class ValueType
+	enum class tsValueType
 	{
 		tsUnknown,
 		tsInt,
@@ -52,15 +59,15 @@ namespace ts
 		tsBool
 	};
 
-	constexpr std::string_view getValueTypeName(ValueType type)
+	constexpr std::string_view getValueTypeName(tsValueType type)
 	{
 		switch (type)
 		{
-			case ValueType::tsFloat:
+			case tsValueType::tsFloat:
 				return "float";
-			case ValueType::tsInt:
+			case tsValueType::tsInt:
 				return "int";
-			case ValueType::tsBool:
+			case tsValueType::tsBool:
 				return "bool";
 			default:
 				return "Unknown type";
@@ -70,26 +77,27 @@ namespace ts
 	class tsBytes
 	{
 	private:
-		std::vector<std::byte> bytes;
+		std::vector<tsByte> bytes;
 	public:
+
 		template <class T>
-		void pushBack(T value)//, unsigned int index)
+		void pushBack(T value)//, tsIndex index)
 		{
 			size_t index = bytes.size();
 
-			bytes.resize(bytes.size() + sizeof(T), std::byte(0));
+			bytes.resize(bytes.size() + sizeof(T), tsByte(0));
 			std::memcpy(&bytes[index], &value, sizeof(T));
 		}
 		template <class T>
 		void set(size_t index, T value)
 		{
-			massert(index >= 0 && index < bytes.size() + 1 - sizeof(T), "Index " + std::to_string(index) + " out of byte range");
+			tsMASSERT(index >= 0 && index < bytes.size() + 1 - sizeof(T), "Index " + std::to_string(index) + " out of byte range");
 			std::memcpy(&bytes[index], &value, sizeof(T));
 		}
 		template <class T>
 		T read(size_t index) const
 		{
-			massert(index >= 0 && index < bytes.size() + 1 - sizeof(T), "Index " + std::to_string(index) + " out of byte range");
+			tsMASSERT(index >= 0 && index < bytes.size() + 1 - sizeof(T), "Index " + std::to_string(index) + " out of byte range");
 			T rv;
 			std::memcpy(&rv, &bytes[index], sizeof(T));
 			return rv;
@@ -105,13 +113,20 @@ namespace ts
 		void setSize(size_t size)
 		{
 			bytes.reserve(size);
-			bytes.resize(size, std::byte(0));
+			bytes.resize(size, tsByte(0));
 		}
-		void copy(unsigned int a, unsigned int b, unsigned int size)
+		void copy(tsIndex a, tsIndex b, size_t size)
 		{
-			massert(a >= 0 && a <= bytes.size() - size + 1, "Index " + std::to_string(a) + " out of byte range");
-			massert(b >= 0 && b <= bytes.size() - size + 1, "Index " + std::to_string(b) + " out of byte range");
+			tsMASSERT(a >= 0 && a <= bytes.size() - size + 1, "Index " + std::to_string(a) + " out of byte range");
+			tsMASSERT(b >= 0 && b <= bytes.size() - size + 1, "Index " + std::to_string(b) + " out of byte range");
 			std::memcpy(&bytes[a], &bytes[b], size);
+		}
+		void copy(tsBytes& target, tsIndex a, tsIndex b, size_t size) const
+		{
+			tsMASSERT(a >= 0 && a <= target.bytes.size() - size + 1, "Index " + std::to_string(a) + " out of byte range");
+			tsMASSERT(b >= 0 && b <= bytes.size() - size + 1, "Index " + std::to_string(b) + " out of byte range");
+			std::memcpy(&target.bytes[a], &bytes[b], size);
+
 		}
 	};
 
@@ -124,7 +139,7 @@ namespace ts
 		tsBytes bytes;
 		
 		template<class T>
-		void LOAD(unsigned int index, T value)
+		void LOAD(tsIndex index, T value)
 		{
 			bytes.pushBack(tsLOAD);
 			bytes.pushBack((unsigned int)sizeof(T));
@@ -132,21 +147,21 @@ namespace ts
 			bytes.pushBack(value);
 		}
 		template<class T>
-		void MOVE(unsigned int var, unsigned int targetIndex)
+		void MOVE(tsIndex var, tsIndex targetIndex)
 		{
 			bytes.pushBack(tsMOVE);
 			bytes.pushBack((unsigned int)sizeof(T));
 			bytes.pushBack(var);
 			bytes.pushBack(targetIndex);
 		}
-		template<ValueType T1, ValueType T2>
-		void CAST(unsigned int a, unsigned int b)
+		template<tsValueType T1, tsValueType T2>
+		void CAST(tsIndex a, tsIndex b)
 		{
-			if (T1 == ValueType::tsInt && T2 == ValueType::tsFloat)
+			if (T1 == tsValueType::tsInt && T2 == tsValueType::tsFloat)
 			{
 				bytes.pushBack(tsItoF);
 			}
-			else if (T1 == ValueType::tsFloat && T2 == ValueType::tsInt)
+			else if (T1 == tsValueType::tsFloat && T2 == tsValueType::tsInt)
 			{
 
 				bytes.pushBack(tsFtoI);
@@ -154,7 +169,7 @@ namespace ts
 			bytes.pushBack(a);
 			bytes.pushBack(b);
 		}
-		size_t JUMPF(unsigned int condition)
+		size_t JUMPF(tsIndex condition)
 		{
 			bytes.pushBack(tsJUMPF);
 			bytes.pushBack(condition);
@@ -167,17 +182,17 @@ namespace ts
 			bytes.pushBack(tsJUMP);
 			bytes.pushBack(index);
 		}
-		void pushCmd(std::byte c)
+		void pushCmd(tsByte c)
 		{
 			bytes.pushBack(c);
 		}
-		void pushCmd(std::byte c, unsigned int i, unsigned int r)
+		void pushCmd(tsByte c, tsIndex i, tsIndex r)
 		{
 			bytes.pushBack(c);
 			bytes.pushBack(i);
 			bytes.pushBack(r);
 		}
-		void pushCmd(std::byte c, unsigned int a, unsigned int b, unsigned int r)
+		void pushCmd(tsByte c, tsIndex a, tsIndex b, tsIndex r)
 		{
 			bytes.pushBack(c);
 			bytes.pushBack(a);
@@ -196,24 +211,32 @@ namespace ts
 			tsRef
 		};
 
-		ValueType type;
+		tsValueType type;
 		GlobalType writeMode;
 		std::string identifier;
-		unsigned int index;
+		tsIndex index;
 	};
 
 	class tsConst
 	{
 	public:
-		ValueType type;
+		tsValueType type;
 		std::string identifier;
-		unsigned int index;
+		tsIndex index;
+	};
+
+	class tsFunction
+	{
+	public:
+		std::string identifier;
+		           //Index          bytecode                 stack
+		void (*func)(tsIndex, const std::vector<std::byte>&, std::vector<std::byte>&);
 	};
 
 	class tsScript
 	{
 	public:
-		unsigned int numBytes;
+		tsIndex numBytes;
 
 		std::vector<tsGlobal> globals;
 		tsBytecode bytecode;
@@ -223,6 +246,7 @@ namespace ts
 	class tsContext
 	{
 	public:
+		std::vector<tsFunction> functions;
 		std::vector<tsScript> scripts;
 	};
 
@@ -231,7 +255,7 @@ namespace ts
 	private:
 		std::shared_ptr<tsContext> _context;
 
-		unsigned int loadedScript;
+		tsIndex loadedScript;
 		bool scriptLoaded;
 
 		size_t cursor;
@@ -243,7 +267,7 @@ namespace ts
 			_context = context;
 		}
 
-		void LoadScript(unsigned int script)
+		void LoadScript(tsIndex script)
 		{
 			loadedScript = script;
 			cursor = 0;
@@ -260,7 +284,7 @@ namespace ts
 			if (scriptLoaded)
 			{
 				tsScript& script = _context->scripts[loadedScript];
-				for (unsigned int i = 0; i < script.globals.size(); i++)
+				for (tsIndex i = 0; i < script.globals.size(); i++)
 				{
 					if (script.globals[i].identifier == identifier)
 					{
@@ -268,14 +292,14 @@ namespace ts
 						return;
 					}
 				}
-				massert(false, "Could not find identifier: " + identifier);
+				tsMASSERT(false, "Could not find identifier: " + identifier);
 			}
 			else
 				std::cout << "Could not set global, no loaded function.\n";
 		}
 
 		template<class T>
-		void SetGlobal(unsigned int index, T value)
+		void SetGlobal(tsIndex index, T value)
 		{
 			tsScript& script = _context->scripts[loadedScript];
 			stack.set(script.globals[index].index, value);
@@ -288,14 +312,14 @@ namespace ts
 			if (scriptLoaded)
 			{
 				tsScript& script = _context->scripts[loadedScript];
-				for (unsigned int i = 0; i < script.globals.size(); i++)
+				for (tsIndex i = 0; i < script.globals.size(); i++)
 				{
 					if (script.globals[i].identifier == identifier)
 					{
 						return GetGlobal<T>(i);
 					}
 				}
-				massert(false, "Could not find identifier: " + identifier);
+				tsMASSERT(false, "Could not find identifier: " + identifier);
 			}
 			else
 				std::cout << "Could not set global, no loaded function.\n";
@@ -303,7 +327,7 @@ namespace ts
 		}
 
 		template<class T>
-		T GetGlobal(unsigned int index)
+		T GetGlobal(tsIndex index)
 		{
 			tsScript& script = _context->scripts[loadedScript];
 			return stack.read<T>(script.globals[index].index);
@@ -323,8 +347,8 @@ namespace ts
 			bool executing = true;
 			while (executing && cursor < bytecode.bytes.size())
 			{
-				//std::cout << "Executing code " << (int)bytecode.bytes.read<std::byte>(cursor) << " at index " << cursor << std::endl;
-				switch (bytecode.bytes.read<std::byte>(cursor))
+				//std::cout << "Executing code " << (int)bytecode.bytes.read<tsByte>(cursor) << " at index " << cursor << std::endl;
+				switch (bytecode.bytes.read<tsByte>(cursor))
 				{
 					case tsEND:
 						executing = false;
@@ -337,12 +361,12 @@ namespace ts
 						break;
 					case tsJUMPF:
 					{
-						unsigned int condition = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex condition = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
 						size_t index = bytecode.bytes.read<size_t>(cursor);
 						//std::cout << sizeof(size_t);
 						cursor += 7;
-						if (!stack.read<bool>(condition))
+						if (!stack.read<tsBool>(condition))
 						{
 							cursor = index - 1;
 						}
@@ -350,249 +374,239 @@ namespace ts
 					}
 					case tsLOAD:
 					{
-						unsigned int size = bytecode.bytes.read<unsigned int>(++cursor);
-						cursor += 4;
-						unsigned int index = bytecode.bytes.read<unsigned int>(cursor);
-						cursor += 3;
-						for (int i = 0; i < size; i++)
-						{
-							stack.set(index + i, bytecode.bytes.read<std::byte>(++cursor));
-						}
+						size_t size = bytecode.bytes.read<tsIndex>(++cursor);
+						cursor += sizeof(tsIndex);
+						tsIndex index = bytecode.bytes.read<tsIndex>(cursor);
+						cursor += sizeof(tsIndex);
+						bytecode.bytes.copy(stack, index, cursor, size);
+						cursor += size - 1;
 					}
 						break;
 					case tsMOVE:
 					{
-						unsigned int size = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex size = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int index1 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index1 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index2 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
 						stack.copy(index2, index1, size);
-						if (size == 4 && false)
-						{
-							std::cout << "Value of moved float: " << stack.read<float>(index1) << std::endl;
-							std::cout << "Value of moved int: " << stack.read<int>(index1) << std::endl;
-							std::cout << "Value of moved bool: " << stack.read<bool>(index1) << std::endl;
-						}
 					}
 						break;
 					case tsFtoI:
 					{
-						unsigned int index1 = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex index1 = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index2 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(index2, (int)(stack.read<float>(index1)));
+						stack.set<tsInt>(index2, stack.read<tsFloat>(index1));
 					}
 						break;
 					case tsItoF:
 					{
-						unsigned int index1 = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex index1 = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index2 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(index2, (float)(stack.read<int>(index1)));
+						stack.set<tsFloat>(index2, stack.read<tsInt>(index1));
 					}
 						break;
 					case tsFLIPF:
 					{
-						unsigned int index1 = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex index1 = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index2 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(index2, -stack.read<float>(index1));
+						stack.set(index2, -stack.read<tsFloat>(index1));
 					}
 						break;
 					case tsADDF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						//std::cout << "Adding: " << stack.read<float>(a) << " to " << stack.read<float>(b) << std::endl;
-						stack.set(r, stack.read<float>(a) + stack.read<float>(b));
-						//std::cout << "result of adding is: " << stack.read<float>(r) << std::endl;
+						stack.set(r, stack.read<tsFloat>(a) + stack.read<tsFloat>(b));
 						break;
 					}
 					case tsMULF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<float>(a) * stack.read<float>(b));
+						stack.set(r, stack.read<tsFloat>(a) * stack.read<tsFloat>(b));
 					}
 						break;
 					case tsDIVF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<float>(a) / stack.read<float>(b));
+						stack.set(r, stack.read<tsFloat>(a) / stack.read<tsFloat>(b));
 					}
 					break;
 					case tsFLIPI:
 					{
-						unsigned int index1 = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex index1 = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int index2 = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex index2 = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(index2, -stack.read<int>(index1));
+						stack.set(index2, -stack.read<tsInt>(index1));
 					}
 					break;
 					case tsADDI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) + stack.read<int>(b));
+						stack.set(r, stack.read<tsInt>(a) + stack.read<tsInt>(b));
 						break;
 					}
 					case tsMULI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) * stack.read<int>(b));
+						stack.set(r, stack.read<tsInt>(a) * stack.read<tsInt>(b));
 					}
 					break;
 					case tsDIVI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) / stack.read<int>(b));
+						stack.set(r, stack.read<tsInt>(a) / stack.read<tsInt>(b));
 					}
 					break;
 					case tsNOT:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, !stack.read<bool>(a));
+						stack.set(r, !stack.read<tsBool>(a));
 					}
 					break;
 					case tsAND:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<bool>(a) && stack.read<bool>(b));
+						stack.set(r, stack.read<tsBool>(a) && stack.read<tsBool>(b));
 					}
 					break;
 					case tsOR:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<bool>(a) || stack.read<bool>(b));
+						stack.set(r, stack.read<tsBool>(a) || stack.read<tsBool>(b));
 					}
 					break;
 					case tsEqualI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) == stack.read<int>(b));
+						stack.set<tsBool>(r, stack.read<tsInt>(a) == stack.read<tsInt>(b));
 					}
 						break;
 					case tsEqualF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<float>(a) == stack.read<float>(b));
+						stack.set<tsBool>(r, stack.read<tsFloat>(a) == stack.read<tsFloat>(b));
 					}
 					break;
 					case tsEqualB:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<bool>(a) == stack.read<bool>(b));
+						stack.set<tsBool>(r, stack.read<tsBool>(a) == stack.read<tsBool>(b));
 					}
 					break;
 					case tsLessI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) < stack.read<int>(b));
+						stack.set<tsBool>(r, stack.read<tsInt>(a) < stack.read<tsInt>(b));
 					}
 					break;
 					case tsLessF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<float>(a) < stack.read<float>(b));
+						stack.set<tsBool>(r, stack.read<tsFloat>(a) < stack.read<tsFloat>(b));
 					}
 					break;
 					case tsLessEqualI:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<int>(a) <= stack.read<int>(b));
+						stack.set<tsBool>(r, stack.read<int>(a) <= stack.read<int>(b));
 					}
 					break;
 					case tsLessEqualF:
 					{
-						unsigned int a = bytecode.bytes.read<unsigned int>(++cursor);
+						tsIndex a = bytecode.bytes.read<tsIndex>(++cursor);
 						cursor += 4;
-						unsigned int b = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex b = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 4;
-						unsigned int r = bytecode.bytes.read<unsigned int>(cursor);
+						tsIndex r = bytecode.bytes.read<tsIndex>(cursor);
 						cursor += 3;
-						stack.set(r, stack.read<float>(a) <= stack.read<float>(b));
+						stack.set<tsBool>(r, stack.read<tsFloat>(a) <= stack.read<tsFloat>(b));
 					}
 					break;
 					default:
 					{
 					#ifdef _DEBUG
-						massert(false, "Unknown byte code! " + std::to_string((unsigned int)bytecode.bytes.read<std::byte>(cursor)));
+						tsMASSERT(false, "Unknown byte code! " + std::to_string((unsigned int)bytecode.bytes.read<tsByte>(cursor)));
 					#else
 						//This apperently removes the default check from the switch, increasing speed
 						__assume(false);

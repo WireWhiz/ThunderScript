@@ -1,23 +1,7 @@
-// this is a comment
+#ref int a
+#ref bool b
+#ref float c
+#in int d
+#in bool e
+#in float f
 
-#in float a
-#in float b
-#ref float r
-#ref bool testBool
-
-/*
-
-Test comment to  make sure the line that the errors 
-report is correct
-
-*/
-
-r = 0;
-float lastValue = 0;
-float limit = 2000000000;
-while (!testBool){
-	r = r + 1;
-	if(lastValue == r)
-		testBool = true;
-	lastValue = r;
-} 
