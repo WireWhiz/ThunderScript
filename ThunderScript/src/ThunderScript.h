@@ -51,23 +51,23 @@ namespace ts
 	typedef bool tsBool;
 	
 
-	enum class tsValueType
+	enum class tsVarType
 	{
-		tsUnknown,
+		tsNone,
 		tsInt,
 		tsFloat,
 		tsBool
 	};
 
-	constexpr std::string_view getValueTypeName(tsValueType type)
+	constexpr std::string_view getVarTypeName(tsVarType type)
 	{
 		switch (type)
 		{
-			case tsValueType::tsFloat:
+			case tsVarType::tsFloat:
 				return "float";
-			case tsValueType::tsInt:
+			case tsVarType::tsInt:
 				return "int";
-			case tsValueType::tsBool:
+			case tsVarType::tsBool:
 				return "bool";
 			default:
 				return "Unknown type";
@@ -146,29 +146,14 @@ namespace ts
 			bytes.pushBack(index);
 			bytes.pushBack(value);
 		}
-		template<class T>
-		void MOVE(tsIndex var, tsIndex targetIndex)
+		void MOVE(tsIndex var, tsIndex targetIndex, unsigned int size)
 		{
 			bytes.pushBack(tsMOVE);
-			bytes.pushBack((unsigned int)sizeof(T));
+			bytes.pushBack(size);
 			bytes.pushBack(var);
 			bytes.pushBack(targetIndex);
 		}
-		template<tsValueType T1, tsValueType T2>
-		void CAST(tsIndex a, tsIndex b)
-		{
-			if (T1 == tsValueType::tsInt && T2 == tsValueType::tsFloat)
-			{
-				bytes.pushBack(tsItoF);
-			}
-			else if (T1 == tsValueType::tsFloat && T2 == tsValueType::tsInt)
-			{
-
-				bytes.pushBack(tsFtoI);
-			}
-			bytes.pushBack(a);
-			bytes.pushBack(b);
-		}
+		template<tsVarType T1, tsVarType T2>
 		size_t JUMPF(tsIndex condition)
 		{
 			bytes.pushBack(tsJUMPF);
@@ -211,7 +196,7 @@ namespace ts
 			tsRef
 		};
 
-		tsValueType type;
+		tsVarType type;
 		GlobalType writeMode;
 		std::string identifier;
 		tsIndex index;
@@ -220,7 +205,7 @@ namespace ts
 	class tsConst
 	{
 	public:
-		tsValueType type;
+		tsVarType type;
 		std::string identifier;
 		tsIndex index;
 	};
@@ -273,7 +258,7 @@ namespace ts
 			cursor = 0;
 			stack.clear();
 			stack.setSize(_context->scripts[loadedScript].numBytes);
-			ExecuteByteCode(_context->scripts[loadedScript].bytecode);
+			//ExecuteByteCode(_context->scripts[loadedScript].bytecode);
 			scriptLoaded = true;
 		}
 

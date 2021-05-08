@@ -32,7 +32,7 @@
 
 
 /**
- ** \file config.tab.hh
+ ** \file bison.tab.hh
  ** Define the ts::parser class.
  */
 
@@ -41,10 +41,11 @@
 // Undocumented macros, especially those whose name start with YY_,
 // are private implementation details.  Do not rely on them.
 
-#ifndef YY_YY_CONFIG_TAB_HH_INCLUDED
-# define YY_YY_CONFIG_TAB_HH_INCLUDED
+#ifndef YY_YY_BISON_TAB_HH_INCLUDED
+# define YY_YY_BISON_TAB_HH_INCLUDED
 // "%code requires" blocks.
-#line 9 "config.y"
+#line 11 "bison.y"
+
 
    namespace ts {
       class tsCompiler;
@@ -60,7 +61,7 @@
 # endif
 
 
-#line 64 "config.tab.hh"
+#line 65 "bison.tab.hh"
 
 # include <cassert>
 # include <cstdlib> // std::abort
@@ -193,9 +194,9 @@
 # define YYDEBUG 1
 #endif
 
-#line 6 "config.y"
+#line 7 "bison.y"
 namespace ts {
-#line 199 "config.tab.hh"
+#line 200 "bison.tab.hh"
 
 
 
@@ -399,9 +400,16 @@ namespace ts {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
+      // expStart
+      // expression
+      // value
+      char dummy1[sizeof (size_t)];
+
+      // tstCONST_INT
+      // tstCONST_FLOAT
       // tstCONST_STRING
       // tstIDENTIFIER
-      char dummy1[sizeof (std::string)];
+      char dummy2[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -450,38 +458,40 @@ namespace ts {
       enum yytokentype
       {
         tstEND = 258,
-        tstCONST_BOOL = 259,
-        tstCONST_INT = 260,
-        tstCONST_FLOAT = 261,
-        tstCONST_STRING = 262,
-        tstDEF_BOOL = 263,
-        tstDEF_INT = 264,
-        tstDEF_FLOAT = 265,
-        tstDEF_STRING = 266,
-        tstOPEN_BRACKET = 267,
-        tstCLOSE_BRACKET = 268,
-        tstOPEN_CBRACKET = 269,
-        tstCLOSE_CBRACKET = 270,
-        tstOPEN_PAREN = 271,
-        tstCLOSE_PAREN = 272,
-        tstIDENTIFIER = 273,
-        tstIF = 274,
-        tstWHILE = 275,
-        tstADD = 276,
-        tstSUB = 277,
-        tstMUL = 278,
-        tstDIV = 279,
-        tstLESS = 280,
-        tstMORE = 281,
-        tstEQUAL = 282,
-        tstLESS_EQUAL = 283,
-        tstMORE_EQUAL = 284,
-        tstAND = 285,
-        tstOR = 286,
-        tstNOT = 287,
-        tstEXP_END = 288,
-        tstGLOBAL_REF = 289,
-        tstGLOBAL_IN = 290
+        tstTRUE = 259,
+        tstFALSE = 260,
+        tstCONST_INT = 261,
+        tstCONST_FLOAT = 262,
+        tstCONST_STRING = 263,
+        tstDEF_BOOL = 264,
+        tstDEF_INT = 265,
+        tstDEF_FLOAT = 266,
+        tstDEF_STRING = 267,
+        tstOPEN_BRACKET = 268,
+        tstCLOSE_BRACKET = 269,
+        tstOPEN_CBRACKET = 270,
+        tstCLOSE_CBRACKET = 271,
+        tstOPEN_PAREN = 272,
+        tstCLOSE_PAREN = 273,
+        tstIDENTIFIER = 274,
+        tstIF = 275,
+        tstWHILE = 276,
+        tstFOR = 277,
+        tstADD = 278,
+        tstSUB = 279,
+        tstMUL = 280,
+        tstDIV = 281,
+        tstLESS = 282,
+        tstMORE = 283,
+        tstEQUAL = 284,
+        tstLESS_EQUAL = 285,
+        tstMORE_EQUAL = 286,
+        tstAND = 287,
+        tstOR = 288,
+        tstNOT = 289,
+        tstEXP_END = 290,
+        tstGLOBAL_REF = 291,
+        tstGLOBAL_IN = 292
       };
     };
 
@@ -536,6 +546,19 @@ namespace ts {
       {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, size_t&& v, location_type&& l)
+        : Base (t)
+        , value (std::move (v))
+        , location (std::move (l))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const size_t& v, const location_type& l)
+        : Base (t)
+        , value (v)
+        , location (l)
+      {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, std::string&& v, location_type&& l)
         : Base (t)
         , value (std::move (v))
@@ -571,8 +594,16 @@ namespace ts {
         // Type destructor.
 switch (yytype)
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.template destroy< size_t > ();
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.template destroy< std::string > ();
         break;
 
@@ -652,26 +683,26 @@ switch (yytype)
       symbol_type (int tok, location_type l)
         : super_type(token_type (tok), std::move (l))
       {
-        YY_ASSERT (tok == 0 || tok == token::tstEND || tok == token::tstCONST_BOOL || tok == token::tstCONST_INT || tok == token::tstCONST_FLOAT || tok == token::tstDEF_BOOL || tok == token::tstDEF_INT || tok == token::tstDEF_FLOAT || tok == token::tstDEF_STRING || tok == token::tstOPEN_BRACKET || tok == token::tstCLOSE_BRACKET || tok == token::tstOPEN_CBRACKET || tok == token::tstCLOSE_CBRACKET || tok == token::tstOPEN_PAREN || tok == token::tstCLOSE_PAREN || tok == token::tstIF || tok == token::tstWHILE || tok == token::tstADD || tok == token::tstSUB || tok == token::tstMUL || tok == token::tstDIV || tok == token::tstLESS || tok == token::tstMORE || tok == token::tstEQUAL || tok == token::tstLESS_EQUAL || tok == token::tstMORE_EQUAL || tok == token::tstAND || tok == token::tstOR || tok == token::tstNOT || tok == token::tstEXP_END || tok == token::tstGLOBAL_REF || tok == token::tstGLOBAL_IN);
+        YY_ASSERT (tok == 0 || tok == token::tstEND || tok == token::tstTRUE || tok == token::tstFALSE || tok == token::tstDEF_BOOL || tok == token::tstDEF_INT || tok == token::tstDEF_FLOAT || tok == token::tstDEF_STRING || tok == token::tstOPEN_BRACKET || tok == token::tstCLOSE_BRACKET || tok == token::tstOPEN_CBRACKET || tok == token::tstCLOSE_CBRACKET || tok == token::tstOPEN_PAREN || tok == token::tstCLOSE_PAREN || tok == token::tstIF || tok == token::tstWHILE || tok == token::tstFOR || tok == token::tstADD || tok == token::tstSUB || tok == token::tstMUL || tok == token::tstDIV || tok == token::tstLESS || tok == token::tstMORE || tok == token::tstEQUAL || tok == token::tstLESS_EQUAL || tok == token::tstMORE_EQUAL || tok == token::tstAND || tok == token::tstOR || tok == token::tstNOT || tok == token::tstEXP_END || tok == token::tstGLOBAL_REF || tok == token::tstGLOBAL_IN);
       }
 #else
       symbol_type (int tok, const location_type& l)
         : super_type(token_type (tok), l)
       {
-        YY_ASSERT (tok == 0 || tok == token::tstEND || tok == token::tstCONST_BOOL || tok == token::tstCONST_INT || tok == token::tstCONST_FLOAT || tok == token::tstDEF_BOOL || tok == token::tstDEF_INT || tok == token::tstDEF_FLOAT || tok == token::tstDEF_STRING || tok == token::tstOPEN_BRACKET || tok == token::tstCLOSE_BRACKET || tok == token::tstOPEN_CBRACKET || tok == token::tstCLOSE_CBRACKET || tok == token::tstOPEN_PAREN || tok == token::tstCLOSE_PAREN || tok == token::tstIF || tok == token::tstWHILE || tok == token::tstADD || tok == token::tstSUB || tok == token::tstMUL || tok == token::tstDIV || tok == token::tstLESS || tok == token::tstMORE || tok == token::tstEQUAL || tok == token::tstLESS_EQUAL || tok == token::tstMORE_EQUAL || tok == token::tstAND || tok == token::tstOR || tok == token::tstNOT || tok == token::tstEXP_END || tok == token::tstGLOBAL_REF || tok == token::tstGLOBAL_IN);
+        YY_ASSERT (tok == 0 || tok == token::tstEND || tok == token::tstTRUE || tok == token::tstFALSE || tok == token::tstDEF_BOOL || tok == token::tstDEF_INT || tok == token::tstDEF_FLOAT || tok == token::tstDEF_STRING || tok == token::tstOPEN_BRACKET || tok == token::tstCLOSE_BRACKET || tok == token::tstOPEN_CBRACKET || tok == token::tstCLOSE_CBRACKET || tok == token::tstOPEN_PAREN || tok == token::tstCLOSE_PAREN || tok == token::tstIF || tok == token::tstWHILE || tok == token::tstFOR || tok == token::tstADD || tok == token::tstSUB || tok == token::tstMUL || tok == token::tstDIV || tok == token::tstLESS || tok == token::tstMORE || tok == token::tstEQUAL || tok == token::tstLESS_EQUAL || tok == token::tstMORE_EQUAL || tok == token::tstAND || tok == token::tstOR || tok == token::tstNOT || tok == token::tstEXP_END || tok == token::tstGLOBAL_REF || tok == token::tstGLOBAL_IN);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
       symbol_type (int tok, std::string v, location_type l)
         : super_type(token_type (tok), std::move (v), std::move (l))
       {
-        YY_ASSERT (tok == token::tstCONST_STRING || tok == token::tstIDENTIFIER);
+        YY_ASSERT (tok == token::tstCONST_INT || tok == token::tstCONST_FLOAT || tok == token::tstCONST_STRING || tok == token::tstIDENTIFIER);
       }
 #else
       symbol_type (int tok, const std::string& v, const location_type& l)
         : super_type(token_type (tok), v, l)
       {
-        YY_ASSERT (tok == token::tstCONST_STRING || tok == token::tstIDENTIFIER);
+        YY_ASSERT (tok == token::tstCONST_INT || tok == token::tstCONST_FLOAT || tok == token::tstCONST_STRING || tok == token::tstIDENTIFIER);
       }
 #endif
     };
@@ -729,46 +760,61 @@ switch (yytype)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_tstCONST_BOOL (location_type l)
+      make_tstTRUE (location_type l)
       {
-        return symbol_type (token::tstCONST_BOOL, std::move (l));
+        return symbol_type (token::tstTRUE, std::move (l));
       }
 #else
       static
       symbol_type
-      make_tstCONST_BOOL (const location_type& l)
+      make_tstTRUE (const location_type& l)
       {
-        return symbol_type (token::tstCONST_BOOL, l);
+        return symbol_type (token::tstTRUE, l);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_tstCONST_INT (location_type l)
+      make_tstFALSE (location_type l)
       {
-        return symbol_type (token::tstCONST_INT, std::move (l));
+        return symbol_type (token::tstFALSE, std::move (l));
       }
 #else
       static
       symbol_type
-      make_tstCONST_INT (const location_type& l)
+      make_tstFALSE (const location_type& l)
       {
-        return symbol_type (token::tstCONST_INT, l);
+        return symbol_type (token::tstFALSE, l);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_tstCONST_FLOAT (location_type l)
+      make_tstCONST_INT (std::string v, location_type l)
       {
-        return symbol_type (token::tstCONST_FLOAT, std::move (l));
+        return symbol_type (token::tstCONST_INT, std::move (v), std::move (l));
       }
 #else
       static
       symbol_type
-      make_tstCONST_FLOAT (const location_type& l)
+      make_tstCONST_INT (const std::string& v, const location_type& l)
       {
-        return symbol_type (token::tstCONST_FLOAT, l);
+        return symbol_type (token::tstCONST_INT, v, l);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_tstCONST_FLOAT (std::string v, location_type l)
+      {
+        return symbol_type (token::tstCONST_FLOAT, std::move (v), std::move (l));
+      }
+#else
+      static
+      symbol_type
+      make_tstCONST_FLOAT (const std::string& v, const location_type& l)
+      {
+        return symbol_type (token::tstCONST_FLOAT, v, l);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -979,6 +1025,21 @@ switch (yytype)
       make_tstWHILE (const location_type& l)
       {
         return symbol_type (token::tstWHILE, l);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_tstFOR (location_type l)
+      {
+        return symbol_type (token::tstFOR, std::move (l));
+      }
+#else
+      static
+      symbol_type
+      make_tstFOR (const location_type& l)
+      {
+        return symbol_type (token::tstFOR, l);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1285,7 +1346,7 @@ switch (yytype)
     static const char* const yytname_[];
 #if YYDEBUG
     // YYRLINE[YYN] -- Source line where rule number YYN was defined.
-    static const signed char yyrline_[];
+    static const unsigned char yyrline_[];
     /// Report on the debug stream that the rule \a r is going to be reduced.
     virtual void yy_reduce_print_ (int r);
     /// Print the state stack on the debug stream.
@@ -1512,10 +1573,10 @@ switch (yytype)
     enum
     {
       yyeof_ = 0,
-      yylast_ = 32,     ///< Last index in yytable_.
-      yynnts_ = 5,  ///< Number of nonterminal symbols.
-      yyfinal_ = 18, ///< Termination state number.
-      yyntokens_ = 36  ///< Number of tokens.
+      yylast_ = 76,     ///< Last index in yytable_.
+      yynnts_ = 14,  ///< Number of nonterminal symbols.
+      yyfinal_ = 39, ///< Termination state number.
+      yyntokens_ = 38  ///< Number of tokens.
     };
 
 
@@ -1525,12 +1586,12 @@ switch (yytype)
   };
 
 
-#line 6 "config.y"
+#line 7 "bison.y"
 } // ts
-#line 1531 "config.tab.hh"
+#line 1592 "bison.tab.hh"
 
 
 
 
 
-#endif // !YY_YY_CONFIG_TAB_HH_INCLUDED
+#endif // !YY_YY_BISON_TAB_HH_INCLUDED

@@ -1,7 +1,12 @@
-#ref int a
-#ref bool b
+#ref float a
+#ref float b
 #ref float c
 #in int d
 #in bool e
 #in float f
 
+int tA;
+tA = 2;
+int tB = 3;
+
+c = tA + tB + a + b;

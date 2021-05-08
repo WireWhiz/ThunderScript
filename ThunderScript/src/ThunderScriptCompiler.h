@@ -1,72 +1,18 @@
 #pragma once
-#include <vector>
-#include <array>
-#include <string>
-#include <string_view>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cstddef>
-#include <map>
-#include <stack>
 
-#include "ThunderScript.h"
+#ifndef TS_COMPILER
+#define TS_COMPILER
+#include "thunderscript.h"
+#include <string>
+#include <iostream>
+
+#include "../bison/bison.tab.hh"
 #if ! defined(yyFlexLexerOnce)
 #include <FlexLexer.h>
 #endif
-#include "../bison/config.tab.hh"
-#include "location.hh"
 
 namespace ts
 {
-	// Thunder Script Reserved Words
-	constexpr std::array<const std::string_view, 12> tsReservedWords = {
-		// Best practices, put the longer ones first just in case
-		"end", //To be removed, will be replaced with out structs
-		"def",
-		"int",
-		"float",
-		"bool",
-		"if",
-		"in",
-		"ref",
-		"true",
-		"false",
-		"while",
-		"for"
-	};
-	constexpr tsIndex GetIndexOfReservedWord(const char token[])
-	{
-		for (tsIndex i = 0; i < tsReservedWords.size(); i++)
-		{
-			if (token == tsReservedWords[i])
-				return i;
-		}
-		return 0;
-	}
-	// Thunder Script Operators
-	constexpr std::array<const std::string_view, 25> tsOperators = {
-		// Longer Operators must be defined first or they will be mistaken for shorter ones
-		"++", "--", "+=", "-=",
-		">=", "<=", "||", "&&", 
-		"==",
-		"(", ")", "{", "}", "[", "]",
-		";", "+", "-", "=", "*", "/",
-		"#", ">", "<",  "!"
-	};
-	constexpr tsIndex GetIndexOfOperator(const char token[])
-	{
-		int output = 0;
-		for (tsIndex i = 0; i < tsOperators.size(); i++)
-		{
-			if (token == tsOperators[i])
-			{
-				output = i;
-				break;
-			}
-		}
-		return output;
-	}
 
 	class tsCompileError
 	{
@@ -85,39 +31,17 @@ namespace ts
 		}
 	};
 
-	class tsToken
-	{
-	public:
-		enum class Type
-		{
-			tsOperator,
-			tsReservedWord,
-			tsIdentifier,
-		};
-		Type type;
-		std::string token;
-		int tokenIndex;
-		size_t line;
-		tsToken(Type _type, std::string& _token, int _tokenIndex, size_t _line)
-		{
-			type = _type;
-			token = _token;
-			tokenIndex = _tokenIndex;
-			line = _line;
-
-		}
-	};
-
-	class tsVar
+	struct tsVar
 	{
 	public:
 		std::string identifier;
 		tsIndex index;
-		tsValueType type;
+		tsVarType type;
 		bool inUse;
 		bool constant;
 		bool initalized;
 		int size;
+		size_t varIndex;
 	};
 
 	class tsVarPool
@@ -128,170 +52,27 @@ namespace ts
 		unsigned int tempIndex = 0;
 		std::stack<std::vector<tsVar*>> scopes;
 	public:
-		tsVarPool()
-		{
-			scopes.push(std::vector<tsVar*>());
-		}
-		void reset()
-		{
-			vars.clear();
-			bytes = 0;
-			tempIndex = 0;
-			scopes.empty();
-		}
-		size_t sizeOf()
-		{
-			return bytes;
-		}
-		void enterScope()
-		{
-			scopes.push(std::vector<tsVar*>());
-		}
-		void exitScope()
-		{
-			for (size_t i = 0; i < scopes.top().size(); i++)
-			{
-				scopes.top()[i]->inUse = false;
-			}
-			scopes.pop();
-		}
-		tsVar requestTempVar(tsValueType type)
-		{
-			tsVar r = requestVar(type, "temp " + std::to_string(tempIndex++), false, true);
-			return r;
-		}
+		tsVarPool();
+		void reset();
+		size_t sizeOf();
+		void enterScope();
+		void exitScope();
 
-		tsVar requestVar(tsValueType type, const std::string& identifier, bool isConstant = false, bool isInitalized = false)
-		{
-			for (tsIndex i = 0; i < vars.size(); i++)
-			{
-				if (vars[i].type == type && !vars[i].inUse)
-				{
-					vars[i].inUse = true;
-					vars[i].identifier = identifier;
-					vars[i].constant = isConstant;
-					vars[i].initalized = isInitalized;
-					scopes.top().push_back(&vars[i]);
-					return vars[i];
-				}
-			}
-			tsVar var;
-			switch (type)
-			{
-				case tsValueType::tsInt:
-					var.size = sizeof(int);
-					break;
-				case tsValueType::tsFloat:
-					var.size = sizeof(float);
-					break;
-				case tsValueType::tsBool:
-					var.size = sizeof(bool);
-					break;
-				default:
-					tsMASSERT(false, "Tried to create var of unimplemented type");
-					break;
-			}
-			var.index = bytes;
-			bytes += var.size;
-			var.type = type;
-			var.inUse = true;
-			var.constant = isConstant;
-			var.identifier = identifier;
-			var.initalized = isInitalized;
-			size_t index = vars.size();
-			vars.push_back(var);
-			scopes.top().push_back(&vars[index]);
-			std::cout << "created var at byte index: " << var.index << std::endl;
-			return var;
-		}
+		tsVar requestTempVar(tsVarType type, size_t line);
+		tsVar requestVar( const std::string& identifier, tsVarType type, size_t line, bool isConstant = false, bool isInitalized = false);
+		tsVar requestInlineConst(const std::string& identifier, tsVarType type, size_t line);
 
-		template<tsValueType T>
-		tsVar cast(tsBytecode& bytecode, tsVar& var, const size_t& line)
-		{
-			if (var.type == T)
-				return var;
+		void initialize(tsVar var);
+		bool getVarFromIdentifier(std::string identifier, tsVar& var);
+		tsVar getVarFromIndex(size_t index);
 
-			if (var.type == tsValueType::tsUnknown)
-				throw tsCompileError("Can not cast varible of unknown type to " + (std::string)getValueTypeName(T), line);
-
-			std::cout << "casing" << std::endl;
-			tsVar newVar = requestTempVar(T);
-			switch (var.type)
-			{
-				case tsValueType::tsFloat:
-					bytecode.CAST<tsValueType::tsFloat, T>(var.index, newVar.index);
-					break;
-				case tsValueType::tsInt:
-					bytecode.CAST<tsValueType::tsInt, T>(var.index, newVar.index);
-					break;
-				default:
-					tsMASSERT(false, "Unimplemented cast type " + std::to_string((int)var.type));
-					break;
-			}
-			return newVar;
-		}
-
-		void initialize(tsVar var)
-		{
-			for (tsIndex i = 0; i < vars.size(); i++)
-			{
-				if (vars[i].inUse && var.identifier == vars[i].identifier)
-				{
-					vars[i].initalized = true;
-					return;
-				}
-			}
-		}
-		bool getVarFromIdentifier(std::string identifier, tsVar& var)
-		{
-			for (tsIndex i = 0; i < vars.size(); i++)
-			{
-				if (vars[i].inUse && identifier == vars[i].identifier)
-				{
-					var = vars[i];
-					return true;
-				}
-			}
-			return false;
-		}
-		
-	};
-
-	class tsIdentifier
-	{
-	public:
-		enum class IdentType
-		{
-			tsInt,
-			tsFloat,
-			tsFunction
-		};
-		IdentType type;
-		std::string token;
-		tsIdentifier()
-		{
-			tsASSERT(false);
-		}
-		tsIdentifier(const tsIdentifier& ident)
-		{
-			token = ident.token;
-			type = ident.type;
-		}
-		tsIdentifier(const std::string& _token, const IdentType _type)
-		{
-			token = _token;
-			type = _type;
-		}
 	};
 
 
 	class tsScanner : public yyFlexLexer
 	{
 	public:
-		tsScanner(std::istream* in) : yyFlexLexer(in)
-		{
-			loc = new tsParser::location_type();
-		};
+		tsScanner(std::istream* in);
 		using FlexLexer::yylex;
 		virtual int yylex(tsParser::semantic_type* const lval, tsParser::location_type* location);
 
@@ -312,255 +93,42 @@ namespace ts
 		std::unique_ptr<tsScript> script;
 		
 	public:
-		tsCompiler(std::shared_ptr<tsContext>& context)
-		{
-			_context = context;
-		}
-		~tsCompiler()
-		{
-			delete scanner;
-			delete parser;
-		}
+		tsCompiler(std::shared_ptr<tsContext>& context);
+		~tsCompiler();
 
-		bool compileFile(const std::string& path)
-		{
-			// Read the script file. Return if we can't find it.
-			std::ifstream f;
-			f.open(path);
-			if (!f.is_open())
-				return false;
+		bool compileFile(const std::string& path);
 
-			//Read the entire script into a string
-			char c;
-			std::string scriptText = "";
-			while (f.get(c))
-				scriptText += c;
-
-			// Release the file
-			f.close();
-			return compile(scriptText);
-		}
-
-		bool compile(std::string& scriptText)
-		{
-			vars.reset();
-
-			script = std::make_unique<tsScript>();
-			removeComments(scriptText);
-			std::stringstream scriptStream(scriptText);
-
-			//Create scanner
-			delete scanner;
-			try
-			{
-				scanner = new tsScanner( &scriptStream);
-			}
-			catch(std::bad_alloc & error)
-			{
-				std::cerr << "Failed to allocate scanner: (" <<
-					error.what() << "), exiting!!" << std::endl;
-				return false;
-			}
-
-			//create parser
-			delete(parser);
-			try
-			{
-				parser = new tsParser((*scanner) /* scanner */,
-										   (*this) /* driver */);
-			}
-			catch (std::bad_alloc& error)
-			{
-				std::cout << "Failed to allocate parser: (" << 
-					error.what() << "), exiting!!" << std::endl;
-				return false;
-			}
-
-			//parse
-			const int accept(0);
-			if (parser->parse() != accept)
-			{
-				std::cout << "Parse failed" << std::endl;
-				return false;
-			}
-
-			return true;
-		}
+		bool compile(std::string& scriptText);
 
 	#pragma region PreProcessing
-		void removeComments(std::string& scriptText)
-		{
-			size_t len = scriptText.length();
+		void removeComments(std::string& scriptText);
 
-			for (size_t i = 0; i < len - 1; i++)
-			{
+	#pragma endregion
 
-				std::string key({ scriptText[i],scriptText[i + 1] });
-				if (key == "//")
-				{
-					std::cout << "found // comment" << std::endl;
-					size_t length = scriptText.find("\n", i);
-					while (i < length)
-					{
-						if (scriptText[i] != '\n')
-						{
-							scriptText.erase(scriptText.begin() + i);
-							length--;
-						}
-						else
-						{
-							i++;
-						}
-					}
-					scriptText.insert(i, " ");
-					len = scriptText.length();
-				}
-				else if (key == "/*")
-				{
-					std::cout << "Found /**/ comment" << std::endl;
-					size_t length = scriptText.find("*/", i) + 2;
-					while (i < length)
-					{
-						if (scriptText[i] != '\n')
-						{
-							scriptText.erase(scriptText.begin() + i);
-							length--;
-						}
-						else
-						{
-							i++;
-						}
-					}
-					scriptText.insert(i, " ");
-					len = scriptText.length();
-				}
-			}
-		}
 
-		void generateGlobal(const std::string& identifier, const tsValueType& type, const tsGlobal::GlobalType writeMode, const size_t line)
-		{
-			for (tsGlobal g : script->globals)
-			{
-				if (g.identifier == identifier)
-				{
-					throw tsCompileError("Global with identifier: " + identifier + " has already been created.", line);
-				}
-			}
-			tsGlobal g;
-			g.type = type;
-			g.identifier = identifier;
-			std::cout << "Creating global: " << g.identifier << std::endl;
-			tsVar var = vars.requestVar(g.type, g.identifier, tsGlobal::GlobalType::tsRef != writeMode, true);
-			g.index = var.index;
-			script->globals.push_back(g);
+	#pragma region BisonFunctions
+		void generateGlobal(const std::string& identifier, const tsVarType& type, const tsGlobal::GlobalType writeMode, const std::size_t line);
 
-		}
+		tsVar generateVar(const std::string& identifier, const tsVarType& type);
 
+		std::size_t getVarIndex(const std::string& identifier);
+		tsVar getVar(const std::size_t& index);
+
+		void assignVar(std::size_t ai, std::size_t bi, size_t line);
+		void assignVar(tsVar a, tsVar b, size_t line);
+		void enterScope();
+		void exitScope();
+
+		void castVar(tsVar& var, tsVarType targetType, size_t line);
+
+		size_t getConst(const std::string value, tsVarType type, size_t line);
+
+		size_t add(size_t a, size_t b, size_t line);
+		size_t sub(size_t a, size_t b, size_t line);
+
+	#pragma endregion
 		
-	#pragma endregion
-
-	#pragma region Parser
-		static void parseTokens(const std::string& scriptText, std::vector<tsToken>& tokens)
-		{
-			std::cout << "Parsing tokens" << std::endl;
-			tokens.clear();
-			size_t line = 1; // Text editors start at index 1 :(
-			for (size_t i = 0; i < scriptText.length(); i++)
-			{
-				std::cout << "parsing index: " << i << std::endl;
-				char currentChar = scriptText[i];// First we check if the current token is equal to any operators
-				std::string token = "";
-				int tokenIndex = 0;
-				//Did we find the start of a token?
-				if (currentChar != ' ' && currentChar != '\n' && currentChar != '\t')
-				{
-					// Is it an operator?
-					if (isOperator(i, scriptText, tokenIndex))
-					{
-						std::cout << "found operator " << tsOperators[tokenIndex] << std::endl;
-						token = tsOperators[tokenIndex];
-
-						// If it is add it to the vector and increment i
-						tokens.push_back(tsToken(tsToken::Type::tsOperator, token, tokenIndex, line));
-						i += token.length() - 1;
-					}
-					// Then if it wasn't an operator check if it was a reserved word
-					else if (isReservedWord(i, scriptText, tokenIndex))
-					{
-						std::cout << "found reserved word" << std::endl;
-
-						token = tsReservedWords[tokenIndex];
-						// If it is add it to the vector and increment i
-						tokens.push_back(tsToken(tsToken::Type::tsReservedWord, token, tokenIndex, line));
-						i += token.length() - 1;
-					}
-					// If it was not ether of those then it's an identifier or literal of some type
-					else
-					{
-						std::cout << "found identifier" << std::endl;
-
-						//Loop until we find a character that we know is not part of an identifier or literal
-						int endTokenIndex = 0;
-						while (i < scriptText.length()
-							   && !(scriptText[i] == ' '
-									|| scriptText[i] == '\n'
-									|| isOperator(i, scriptText, endTokenIndex)))
-						{
-							token += scriptText[i];
-							i++;
-						}
-						// We incremented one past our desired end point, we need to step back so the next token is parsed on the next loop.
-						i--;
-						// When the loop ends we know we have the whole token so we can add it to the array
-						tsMASSERT(token != "" && token != " ", "Somehow an empty identifier was found. This is wrong.");
-						tokens.push_back(tsToken(tsToken::Type::tsIdentifier, token, -1, line));
-						// If we found an end token we migh as well save ourselves some time and add it as well
-						if (endTokenIndex >= 1)
-						{
-							std::string endToken = (std::string)tsOperators[endTokenIndex];
-							i += endToken.length();
-							tokens.push_back(tsToken(tsToken::Type::tsOperator, endToken, endTokenIndex, line));
-						}
-					}
-				}
-				if (currentChar == '\n')
-					line++;
-			}
-		}
-
-		static bool isOperator(size_t start, const std::string& script, int& token)
-		{
-			
-			tsMASSERT(start < script.length(), "Start must be less then script.length()");
-			for (int o = 0; o < tsOperators.size(); o++)
-			{
-				size_t length = tsOperators[o].length();
-				if (length + start - 1 < script.length()
-					&& script.substr(start, length) == tsOperators[o])
-				{
-					token = o;
-					return true;
-				}
-			}
-			return false;
-		}
-		static bool isReservedWord(size_t start, const std::string& script, int& token)
-		{
-			
-			for (int w = 0; w < tsReservedWords.size(); w++)
-			{
-				size_t length = tsReservedWords[w].length();
-				if (length + start < script.length()
-					&& script.substr(start, length) == tsReservedWords[w])
-				{
-					token = w;
-					return true;
-				}
-			}
-			return false;
-		}
-	#pragma endregion
-
+		/*
 	#pragma region expression operations
 		// 0: variables, 1: add and subtract, 2: multiply and divide, 3: negate, 4: scope
 		class tsOperation
@@ -624,14 +192,14 @@ namespace ts
 			{
 				return DepSide::both;
 			}
-			tsValueType GetStdEqType(const tsVar& a, const tsVar& b)
+			tsVarType GetStdEqType(const tsVar& a, const tsVar& b)
 			{
 				if (a.type == b.type)
 					return a.type;
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					return tsValueType::tsFloat;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					return tsVarType::tsFloat;
 				else
-					return tsValueType::tsUnknown;
+					return tsVarType::tsNone;
 			}
 			void setDeps(std::unique_ptr<tsOperation>& dep1, std::unique_ptr<tsOperation>& dep2)
 			{
@@ -695,23 +263,23 @@ namespace ts
 
 				switch (a.type)
 				{
-					case tsValueType::tsFloat:
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsMOVE, sizeof(float), b.index, a.index);
 						break;
-					case tsValueType::tsInt:
-						b = vars.cast<tsValueType::tsInt>(bytecode, b, line);
+					case tsVarType::tsInt:
+						b = vars.cast<tsVarType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsMOVE, sizeof(int), b.index, a.index);
 						break;
-					case tsValueType::tsBool:
-						if(b.type != tsValueType::tsBool)
-							throw tsCompileError("Can not auto cast type " + static_cast<std::string>(getValueTypeName(b.type)) + " to boolian", line);
+					case tsVarType::tsBool:
+						if(b.type != tsVarType::tsBool)
+							throw tsCompileError("Can not auto cast type " + static_cast<std::string>(getVarTypeName(b.type)) + " to boolian", line);
 						bytecode.pushCmd(tsMOVE, sizeof(bool), b.index, a.index);
 						break;
 					default:
-						throw tsCompileError("Can not assign type " + static_cast<std::string>(getValueTypeName(b.type)) + " to " + static_cast<std::string>(getValueTypeName(a.type)), line);
+						throw tsCompileError("Can not assign type " + static_cast<std::string>(getVarTypeName(b.type)) + " to " + static_cast<std::string>(getVarTypeName(a.type)), line);
 				}
-				a.type = tsValueType::tsUnknown;
+				a.type = tsVarType::tsNone;
 				return a;
 			}
 		};
@@ -729,7 +297,7 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = a.type;
+				tsVarType type = a.type;
 
 
 				if (!a.initalized)
@@ -740,14 +308,14 @@ namespace ts
 				tsVar result = vars.requestTempVar(type);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsADDF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
-						a = vars.cast<tsValueType::tsInt>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsInt>(bytecode, b, line);
+					case tsVarType::tsInt:
+						a = vars.cast<tsVarType::tsInt>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
 					default:
@@ -768,7 +336,7 @@ namespace ts
 				vars.enterScope();
 				tsVar a = _dep->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = a.type;
+				tsVarType type = a.type;
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
@@ -776,10 +344,10 @@ namespace ts
 				tsVar result = vars.requestTempVar(type);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
+					case tsVarType::tsFloat:
 						bytecode.pushCmd(tsFLIPF, a.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsFLIPI, a.index, result.index);
 						break;
 					default:
@@ -803,7 +371,7 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = GetStdEqType(a, b);
+				tsVarType type = GetStdEqType(a, b);
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
@@ -813,15 +381,15 @@ namespace ts
 				tsVar result = vars.requestTempVar(type);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsFLIPF, b.index, b.index);
 						bytecode.pushCmd(tsADDF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
-						a = vars.cast<tsValueType::tsInt>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsInt>(bytecode, b, line);
+					case tsVarType::tsInt:
+						a = vars.cast<tsVarType::tsInt>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsFLIPI, b.index, b.index);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
@@ -845,7 +413,7 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = GetStdEqType(a, b);
+				tsVarType type = GetStdEqType(a, b);
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
@@ -855,14 +423,14 @@ namespace ts
 				tsVar result = vars.requestTempVar(type);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsMULF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
-						a = vars.cast<tsValueType::tsInt>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsInt>(bytecode, b, line);
+					case tsVarType::tsInt:
+						a = vars.cast<tsVarType::tsInt>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsMULI, a.index, b.index, result.index);
 						break;
 					default:
@@ -886,7 +454,7 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = GetStdEqType(a, b);
+				tsVarType type = GetStdEqType(a, b);
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
@@ -896,14 +464,14 @@ namespace ts
 				tsVar result = vars.requestTempVar(type);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsADDF,a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
-						a = vars.cast<tsValueType::tsInt>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsInt>(bytecode, b, line);
+					case tsVarType::tsInt:
+						a = vars.cast<tsVarType::tsInt>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsInt>(bytecode, b, line);
 						bytecode.pushCmd(tsADDI, a.index, b.index, result.index);
 						break;
 					default:
@@ -925,12 +493,12 @@ namespace ts
 				vars.enterScope();
 				tsVar a = _dep->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = a.type;
+				tsVarType type = a.type;
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
-				if (a.type != tsValueType::tsBool)
-					throw tsCompileError("Invalid type for not operation: " + (std::string)getValueTypeName(a.type), line);
+				if (a.type != tsVarType::tsBool)
+					throw tsCompileError("Invalid type for not operation: " + (std::string)getVarTypeName(a.type), line);
 
 				tsVar result = vars.requestTempVar(type);
 				bytecode.pushCmd(tsNOT, a.index, result.index);
@@ -952,15 +520,15 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = GetStdEqType(a, b);
+				tsVarType type = GetStdEqType(a, b);
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
-				if (a.type != tsValueType::tsBool)
+				if (a.type != tsVarType::tsBool)
 					throw tsCompileError("Invalid type on left side of AND operation: ", line);
-				if (a.type != tsValueType::tsBool)
+				if (a.type != tsVarType::tsBool)
 					throw tsCompileError("Invalid type on right side of AND operation: ", line);
 
 				tsVar result = vars.requestTempVar(type);
@@ -983,15 +551,15 @@ namespace ts
 				tsVar a = _dep1->getValue(bytecode, vars);
 				tsVar b = _dep2->getValue(bytecode, vars);
 				vars.exitScope();
-				tsValueType type = GetStdEqType(a, b);
+				tsVarType type = GetStdEqType(a, b);
 
 				if (!a.initalized)
 					throw tsCompileError("Use of uninitalized variable: " + a.identifier, line);
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
-				if (a.type != tsValueType::tsBool)
+				if (a.type != tsVarType::tsBool)
 					throw tsCompileError("Invalid type on left side of OR operation: ", line);
-				if (b.type != tsValueType::tsBool)
+				if (b.type != tsVarType::tsBool)
 					throw tsCompileError("Invalid type on right side of OR operation: ", line);
 
 				tsVar result = vars.requestTempVar(type);
@@ -1022,30 +590,30 @@ namespace ts
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
 
-				tsValueType type;
+				tsVarType type;
 
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					type = tsValueType::tsFloat;
-				else if (a.type == tsValueType::tsInt && b.type == tsValueType::tsInt)
-					type = tsValueType::tsInt;
-				else if (a.type == tsValueType::tsBool && b.type == tsValueType::tsBool)
-					type = tsValueType::tsBool;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					type = tsVarType::tsFloat;
+				else if (a.type == tsVarType::tsInt && b.type == tsVarType::tsInt)
+					type = tsVarType::tsInt;
+				else if (a.type == tsVarType::tsBool && b.type == tsVarType::tsBool)
+					type = tsVarType::tsBool;
 				else
-					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
+					throw tsCompileError("Invalid comparason operation between" + (std::string)getVarTypeName(a.type) + " and " + (std::string)getVarTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(tsValueType::tsBool);
+				tsVar result = vars.requestTempVar(tsVarType::tsBool);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsEqualF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsEqualI, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsBool:
+					case tsVarType::tsBool:
 						bytecode.pushCmd(tsEqualB, a.index, b.index, result.index);
 				}
 				return result;
@@ -1073,25 +641,25 @@ namespace ts
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
 
-				tsValueType type;
+				tsVarType type;
 
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					type = tsValueType::tsFloat;
-				else if (a.type == tsValueType::tsInt && b.type == tsValueType::tsInt)
-					type = tsValueType::tsInt;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					type = tsVarType::tsFloat;
+				else if (a.type == tsVarType::tsInt && b.type == tsVarType::tsInt)
+					type = tsVarType::tsInt;
 				else
-					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
+					throw tsCompileError("Invalid comparason operation between" + (std::string)getVarTypeName(a.type) + " and " + (std::string)getVarTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(tsValueType::tsBool);
+				tsVar result = vars.requestTempVar(tsVarType::tsBool);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsLessI, a.index, b.index, result.index);
 						break;
 				}
@@ -1120,25 +688,25 @@ namespace ts
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
 
-				tsValueType type;
+				tsVarType type;
 
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					type = tsValueType::tsFloat;
-				else if (a.type == tsValueType::tsInt && b.type == tsValueType::tsInt)
-					type = tsValueType::tsInt;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					type = tsVarType::tsFloat;
+				else if (a.type == tsVarType::tsInt && b.type == tsVarType::tsInt)
+					type = tsVarType::tsInt;
 				else
-					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
+					throw tsCompileError("Invalid comparason operation between" + (std::string)getVarTypeName(a.type) + " and " + (std::string)getVarTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(tsValueType::tsBool);
+				tsVar result = vars.requestTempVar(tsVarType::tsBool);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessF, b.index, a.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsLessI, b.index, a.index, result.index);
 						break;
 				}
@@ -1167,25 +735,25 @@ namespace ts
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
 
-				tsValueType type;
+				tsVarType type;
 
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					type = tsValueType::tsFloat;
-				else if (a.type == tsValueType::tsInt && b.type == tsValueType::tsInt)
-					type = tsValueType::tsInt;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					type = tsVarType::tsFloat;
+				else if (a.type == tsVarType::tsInt && b.type == tsVarType::tsInt)
+					type = tsVarType::tsInt;
 				else
-					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
+					throw tsCompileError("Invalid comparason operation between" + (std::string)getVarTypeName(a.type) + " and " + (std::string)getVarTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(tsValueType::tsBool);
+				tsVar result = vars.requestTempVar(tsVarType::tsBool);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessEqualF, a.index, b.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsLessEqualI, a.index, b.index, result.index);
 						break;
 				}
@@ -1214,25 +782,25 @@ namespace ts
 				if (!b.initalized)
 					throw tsCompileError("Use of uninitalized varialbe: " + b.identifier, line);
 
-				tsValueType type;
+				tsVarType type;
 
-				if (a.type == tsValueType::tsFloat || b.type == tsValueType::tsFloat)
-					type = tsValueType::tsFloat;
-				else if (a.type == tsValueType::tsInt && b.type == tsValueType::tsInt)
-					type = tsValueType::tsInt;
+				if (a.type == tsVarType::tsFloat || b.type == tsVarType::tsFloat)
+					type = tsVarType::tsFloat;
+				else if (a.type == tsVarType::tsInt && b.type == tsVarType::tsInt)
+					type = tsVarType::tsInt;
 				else
-					throw tsCompileError("Invalid comparason operation between" + (std::string)getValueTypeName(a.type) + " and " + (std::string)getValueTypeName(b.type), line);
+					throw tsCompileError("Invalid comparason operation between" + (std::string)getVarTypeName(a.type) + " and " + (std::string)getVarTypeName(b.type), line);
 
 
-				tsVar result = vars.requestTempVar(tsValueType::tsBool);
+				tsVar result = vars.requestTempVar(tsVarType::tsBool);
 				switch (type)
 				{
-					case tsValueType::tsFloat:
-						a = vars.cast<tsValueType::tsFloat>(bytecode, a, line);
-						b = vars.cast<tsValueType::tsFloat>(bytecode, b, line);
+					case tsVarType::tsFloat:
+						a = vars.cast<tsVarType::tsFloat>(bytecode, a, line);
+						b = vars.cast<tsVarType::tsFloat>(bytecode, b, line);
 						bytecode.pushCmd(tsLessEqualF, b.index, a.index, result.index);
 						break;
-					case tsValueType::tsInt:
+					case tsVarType::tsInt:
 						bytecode.pushCmd(tsLessEqualI, b.index, a.index, result.index);
 						break;
 				}
@@ -1247,7 +815,7 @@ namespace ts
 
 		void GenerateBytecode(std::vector<tsToken> tokens, tsScript& script)
 		{
-			GenerateConstVars(tokens, script.bytecode);
+			//GenerateConstVars(tokens, script.bytecode);
 			for (size_t i = 0; i < tokens.size(); i++)
 			{
 				//tsMASSERT(tokens[i].type == tsToken::Type::tsReservedWord, "token was not of type reserved word, this means you haven't coded in error checking yet and you forgot how your own language works.");
@@ -1262,7 +830,7 @@ namespace ts
 					default:
 						
 						break;
-				}*/
+				}
 			}
 		}
 
@@ -1278,6 +846,7 @@ namespace ts
 
 			//script.functions.push_back(function);
 		}
+		/*
 		void GenerateConstVars(std::vector<tsToken>& tokens, tsBytecode& bytecode)
 		{
 			std::cout << "Generating constants" << std::endl;
@@ -1301,7 +870,7 @@ namespace ts
 							{
 								
 								std::cout << "Making new const int" << std::endl;
-								tsIndex var = vars.requestVar(tsValueType::tsInt, key, true, true).index;
+								tsIndex var = vars.requestVar(tsVarType::tsInt, key, true, true).index;
 								bytecode.LOAD(var, value);
 							}
 							tokens[token].token = key;
@@ -1320,7 +889,7 @@ namespace ts
 							{
 
 								std::cout << "Making new const float" << std::endl;
-								tsIndex var = vars.requestVar(tsValueType::tsFloat, key, true, true).index;
+								tsIndex var = vars.requestVar(tsVarType::tsFloat, key, true, true).index;
 								bytecode.LOAD(var, value);
 							}
 							tokens[token].token = key;
@@ -1348,7 +917,7 @@ namespace ts
 							{
 
 								std::cout << "Making new const true" << std::endl;
-								tsIndex var = vars.requestVar(tsValueType::tsBool, key, true, true).index;
+								tsIndex var = vars.requestVar(tsVarType::tsBool, key, true, true).index;
 								bytecode.LOAD(var, true);
 							}
 							tokens[token].type = tsToken::Type::tsIdentifier;
@@ -1368,7 +937,7 @@ namespace ts
 							{
 
 								std::cout << "Making new const false" << std::endl;
-								tsIndex var = vars.requestVar(tsValueType::tsBool, key, true, true).index;
+								tsIndex var = vars.requestVar(tsVarType::tsBool, key, true, true).index;
 								bytecode.LOAD(var, false);
 							}
 							tokens[token].type = tsToken::Type::tsIdentifier;
@@ -1381,7 +950,7 @@ namespace ts
 			//We signal that we are done loading with a return;
 			bytecode.pushCmd(tsEND);
 		}
-		/**
+		/*
 		void GenerateStatement(size_t& i, const std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			
@@ -1424,13 +993,13 @@ namespace ts
 					switch (tokens[i].tokenIndex)
 					{
 						case GetIndexOfReservedWord("float"):
-							GenerateVar(tsValueType::tsFloat, i, tokens, bytecode);
+							GenerateVar(tsVarType::tsFloat, i, tokens, bytecode);
 							break;
 						case GetIndexOfReservedWord("int"):
-							GenerateVar(tsValueType::tsInt, i, tokens, bytecode);
+							GenerateVar(tsVarType::tsInt, i, tokens, bytecode);
 							break;
 						case GetIndexOfReservedWord("bool"):
-							GenerateVar(tsValueType::tsBool, i, tokens, bytecode);
+							GenerateVar(tsVarType::tsBool, i, tokens, bytecode);
 							break;
 						case GetIndexOfReservedWord("end"):
 							GenerateEnd(i, tokens, bytecode);
@@ -1722,7 +1291,7 @@ namespace ts
 			GenerateOperation(subTokens, conditionOperation);
 			tsVar condition = conditionOperation->getValue(bytecode, vars);
 
-			if (condition.type != tsValueType::tsBool)
+			if (condition.type != tsVarType::tsBool)
 				throw tsCompileError("condition of if statment must be bool", line);
 			if (!condition.initalized)
 				throw tsCompileError("condition of if statment must be initalized", line);
@@ -1768,7 +1337,7 @@ namespace ts
 			GenerateOperation(subTokens, conditionOperation);
 			tsVar condition = conditionOperation->getValue(bytecode, vars);
 
-			if (condition.type != tsValueType::tsBool)
+			if (condition.type != tsVarType::tsBool)
 				throw tsCompileError("condition of if statment must be bool", line);
 			if (!condition.initalized)
 				throw tsCompileError("condition of if statment must be initalized", line);
@@ -1790,7 +1359,7 @@ namespace ts
 			
 		}
 		
-		void GenerateVar(tsValueType type, size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
+		void GenerateVar(tsVarType type, size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			if (tokens.size() <= ++i)
 				throw tsCompileError("Was expecting identifier", line);
@@ -1802,14 +1371,14 @@ namespace ts
 			else
 				++i;
 		}
-		*/
+		
 
 		void GenerateEnd(size_t& i, std::vector<tsToken> tokens, tsBytecode& bytecode)
 		{
 			tsASSERT(tokens[i].token == "end");
 			bytecode.pushCmd(tsEND);
 		}
-		
+		*/
 	#pragma endregion
 
 	};
@@ -1817,3 +1386,5 @@ namespace ts
 	
 
 }
+
+#endif // !TS_COMPILER

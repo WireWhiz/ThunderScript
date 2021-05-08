@@ -21,7 +21,10 @@
     <ClCompile Include="bison\lex.yy.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="bison\config.tab.cc">
+    <ClCompile Include="src\ThunderScriptCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bison\bison.tab.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,16 +44,16 @@
     <ClInclude Include="bison\FlexLexer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bison\config.tab.hh">
+    <ClInclude Include="bison\location.hh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bison\location.hh">
+    <ClInclude Include="bison\bison.tab.hh">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="scripts\HelloWorld.thun" />
-    <None Include="bison\config.l" />
-    <None Include="bison\config.y" />
+    <None Include="bison\flex.l" />
+    <None Include="bison\bison.y" />
   </ItemGroup>
 </Project>

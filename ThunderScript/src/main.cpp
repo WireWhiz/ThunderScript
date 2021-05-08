@@ -30,7 +30,6 @@ int main()
 			if (compiler.compileFile(filePath))
 			{
 				std::cout << "Sucessfully read file!" << std::endl;
-				return 0;
 				ts::tsBytecode bytecode = tsc->scripts[0].bytecode;
 
 				ts::DisplayBytecode(bytecode);
@@ -49,8 +48,7 @@ int main()
 					auto start = std::chrono::high_resolution_clock::now();
 					runtime.Run();
 					auto stop = std::chrono::high_resolution_clock::now();
-					std::cout << "\n\nGlobal r has a value of: " << runtime.GetGlobal<ts::tsInt>("r") << std::endl;
-					std::cout << "Global testBool has a value of: " << runtime.GetGlobal<ts::tsBool>("testBool") << std::endl;
+					std::cout << "\n\nGlobal c has a value of: " << runtime.GetGlobal<ts::tsFloat>("c") << std::endl;
 					std::cout << "Program took: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()
 						<< " microseconds" << std::endl;
 				}

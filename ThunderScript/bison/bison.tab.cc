@@ -36,7 +36,7 @@
 
 
 // First part of user prologue.
-#line 28 "config.y"
+#line 31 "bison.y"
 
 #include "../src/ThunderScriptCompiler.h"
 #include "FlexLexer.h"
@@ -45,10 +45,10 @@
 #undef yylex
 #define yylex scanner.yylex
 
-#line 49 "config.tab.cc"
+#line 49 "bison.tab.cc"
 
 
-#include "config.tab.hh"
+#include "bison.tab.hh"
 
 
 
@@ -140,9 +140,9 @@
 #define YYERROR         goto yyerrorlab
 #define YYRECOVERING()  (!!yyerrstatus_)
 
-#line 6 "config.y"
+#line 7 "bison.y"
 namespace ts {
-#line 146 "config.tab.cc"
+#line 146 "bison.tab.cc"
 
 
   /* Return YYSTR after stripping away unnecessary quotes and
@@ -218,8 +218,16 @@ namespace ts {
   {
     switch (this->type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.move< size_t > (std::move (that.value));
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.move< std::string > (std::move (that.value));
         break;
 
@@ -238,8 +246,16 @@ namespace ts {
   {
     switch (this->type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.copy< size_t > (YY_MOVE (that.value));
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.copy< std::string > (YY_MOVE (that.value));
         break;
 
@@ -265,8 +281,16 @@ namespace ts {
     super_type::move (s);
     switch (this->type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.move< size_t > (YY_MOVE (s.value));
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.move< std::string > (YY_MOVE (s.value));
         break;
 
@@ -361,8 +385,16 @@ namespace ts {
   {
     switch (that.type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.YY_MOVE_OR_COPY< size_t > (YY_MOVE (that.value));
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (that.value));
         break;
 
@@ -381,8 +413,16 @@ namespace ts {
   {
     switch (that.type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.move< size_t > (YY_MOVE (that.value));
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.move< std::string > (YY_MOVE (that.value));
         break;
 
@@ -401,8 +441,16 @@ namespace ts {
     state = that.state;
     switch (that.type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.copy< size_t > (that.value);
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.copy< std::string > (that.value);
         break;
 
@@ -420,8 +468,16 @@ namespace ts {
     state = that.state;
     switch (that.type_get ())
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        value.move< size_t > (that.value);
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         value.move< std::string > (that.value);
         break;
 
@@ -674,8 +730,16 @@ namespace ts {
          when using variants.  */
       switch (yyr1_[yyn])
     {
-      case 7: // tstCONST_STRING
-      case 18: // tstIDENTIFIER
+      case 47: // expStart
+      case 48: // expression
+      case 49: // value
+        yylhs.value.emplace< size_t > ();
+        break;
+
+      case 6: // tstCONST_INT
+      case 7: // tstCONST_FLOAT
+      case 8: // tstCONST_STRING
+      case 19: // tstIDENTIFIER
         yylhs.value.emplace< std::string > ();
         break;
 
@@ -699,50 +763,134 @@ namespace ts {
         {
           switch (yyn)
             {
+  case 4:
+#line 96 "bison.y"
+                                            {compiler.generateVar(yystack_[0].value.as < std::string > (), tsVarType::tsBool);}
+#line 770 "bison.tab.cc"
+    break;
+
+  case 5:
+#line 97 "bison.y"
+                                                                       {tsVar var = compiler.generateVar(yystack_[1].value.as < std::string > (), tsVarType::tsBool);;}
+#line 776 "bison.tab.cc"
+    break;
+
   case 6:
-#line 85 "config.y"
-                                                    {printf("found end");}
-#line 706 "config.tab.cc"
+#line 98 "bison.y"
+                                                           {compiler.generateVar(yystack_[0].value.as < std::string > (), tsVarType::tsInt);}
+#line 782 "bison.tab.cc"
+    break;
+
+  case 7:
+#line 99 "bison.y"
+                                                                          {tsVar var = compiler.generateVar(yystack_[2].value.as < std::string > (), tsVarType::tsInt); compiler.assignVar(var.varIndex, yystack_[0].value.as < size_t > (), scanner.lineno());}
+#line 788 "bison.tab.cc"
     break;
 
   case 8:
-#line 89 "config.y"
-                                                         {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsInt, tsGlobal::GlobalType::tsRef, scanner.lineno());}
-#line 712 "config.tab.cc"
+#line 100 "bison.y"
+                                                             {compiler.generateVar(yystack_[0].value.as < std::string > (), tsVarType::tsFloat);}
+#line 794 "bison.tab.cc"
     break;
 
   case 9:
-#line 90 "config.y"
-                                                                          {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsBool, tsGlobal::GlobalType::tsRef, scanner.lineno());}
-#line 718 "config.tab.cc"
-    break;
-
-  case 10:
-#line 91 "config.y"
-                                                                           {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsFloat, tsGlobal::GlobalType::tsRef, scanner.lineno());}
-#line 724 "config.tab.cc"
-    break;
-
-  case 11:
-#line 92 "config.y"
-                                                                        {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsInt, tsGlobal::GlobalType::tsIn, scanner.lineno());}
-#line 730 "config.tab.cc"
-    break;
-
-  case 12:
-#line 93 "config.y"
-                                                                         {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsBool, tsGlobal::GlobalType::tsIn, scanner.lineno());}
-#line 736 "config.tab.cc"
+#line 101 "bison.y"
+                                                               {printf("Found assign expression "); compiler.assignVar(compiler.getVarIndex(yystack_[2].value.as < std::string > ()), yystack_[0].value.as < size_t > (), scanner.lineno());}
+#line 800 "bison.tab.cc"
     break;
 
   case 13:
-#line 94 "config.y"
-                                                                          {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsValueType::tsFloat, tsGlobal::GlobalType::tsIn, scanner.lineno());}
-#line 742 "config.tab.cc"
+#line 108 "bison.y"
+                                                                    {printf("Found scope");}
+#line 806 "bison.tab.cc"
+    break;
+
+  case 23:
+#line 129 "bison.y"
+                                                         {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsInt, tsGlobal::GlobalType::tsRef, scanner.lineno());}
+#line 812 "bison.tab.cc"
+    break;
+
+  case 24:
+#line 130 "bison.y"
+                                                                          {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsBool, tsGlobal::GlobalType::tsRef, scanner.lineno());}
+#line 818 "bison.tab.cc"
+    break;
+
+  case 25:
+#line 131 "bison.y"
+                                                                           {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsFloat, tsGlobal::GlobalType::tsRef, scanner.lineno());}
+#line 824 "bison.tab.cc"
+    break;
+
+  case 26:
+#line 132 "bison.y"
+                                                                        {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsInt, tsGlobal::GlobalType::tsIn, scanner.lineno());}
+#line 830 "bison.tab.cc"
+    break;
+
+  case 27:
+#line 133 "bison.y"
+                                                                         {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsBool, tsGlobal::GlobalType::tsIn, scanner.lineno());}
+#line 836 "bison.tab.cc"
+    break;
+
+  case 28:
+#line 134 "bison.y"
+                                                                          {compiler.generateGlobal(yystack_[0].value.as < std::string > (), tsVarType::tsFloat, tsGlobal::GlobalType::tsIn, scanner.lineno());}
+#line 842 "bison.tab.cc"
+    break;
+
+  case 29:
+#line 137 "bison.y"
+                                           {yylhs.value.as < size_t > () = yystack_[1].value.as < size_t > ();}
+#line 848 "bison.tab.cc"
+    break;
+
+  case 30:
+#line 139 "bison.y"
+                                                            {yylhs.value.as < size_t > () = compiler.add(yystack_[3].value.as < size_t > (), yystack_[1].value.as < size_t > (), scanner.lineno());}
+#line 854 "bison.tab.cc"
+    break;
+
+  case 31:
+#line 140 "bison.y"
+                                                                    {yylhs.value.as < size_t > () = compiler.sub(yystack_[3].value.as < size_t > (), yystack_[1].value.as < size_t > (), scanner.lineno());}
+#line 860 "bison.tab.cc"
+    break;
+
+  case 32:
+#line 141 "bison.y"
+                                        { yylhs.value.as < size_t > () = yystack_[0].value.as < size_t > ();}
+#line 866 "bison.tab.cc"
+    break;
+
+  case 33:
+#line 144 "bison.y"
+                                {printf("Found identifier\n");yylhs.value.as < size_t > () = compiler.getVarIndex(yystack_[0].value.as < std::string > ());}
+#line 872 "bison.tab.cc"
+    break;
+
+  case 34:
+#line 145 "bison.y"
+                                               {printf("completed const int\n");yylhs.value.as < size_t > () = compiler.getConst(yystack_[0].value.as < std::string > (), tsVarType::tsInt, scanner.lineno());}
+#line 878 "bison.tab.cc"
+    break;
+
+  case 35:
+#line 148 "bison.y"
+                                 {compiler.enterScope();}
+#line 884 "bison.tab.cc"
+    break;
+
+  case 36:
+#line 149 "bison.y"
+                                 {compiler.exitScope();}
+#line 890 "bison.tab.cc"
     break;
 
 
-#line 746 "config.tab.cc"
+#line 894 "bison.tab.cc"
 
             default:
               break;
@@ -1013,76 +1161,105 @@ namespace ts {
   }
 
 
-  const signed char tsParser::yypact_ninf_ = -27;
+  const signed char tsParser::yypact_ninf_ = -60;
 
-  const signed char tsParser::yytable_ninf_ = -1;
+  const signed char tsParser::yytable_ninf_ = -36;
 
   const signed char
   tsParser::yypact_[] =
   {
-      -3,   -26,    -8,   -27,    -7,    -4,     9,    -3,   -27,   -23,
-     -27,    -6,    -5,    -1,     0,     1,     2,     3,   -27,   -27,
-     -27,    -3,   -27,   -27,   -27,   -27,   -27,   -27,   -27
+      17,   -30,   -60,   -10,    -8,    -4,   -16,    24,    25,    33,
+     -60,    20,    38,    51,    26,    -3,   -60,   -60,   -60,   -60,
+     -60,    -2,    27,     1,    40,   -60,    -5,    35,   -60,    -5,
+      -5,    -5,    -5,    46,    47,    48,    49,    50,    52,   -60,
+     -60,   -60,    -5,    -5,   -60,   -60,    17,   -60,   -60,    -5,
+     -60,    54,    55,    56,   -60,   -60,   -60,   -60,   -60,   -60,
+     -60,   -60,    59,   -60,    17,    17,    17,   -60,   -60,   -60,
+     -60,   -60,   -60,   -60
   };
 
   const signed char
   tsParser::yydefact_[] =
   {
-       0,     0,     0,     7,     0,     0,     0,     3,     4,     0,
-       6,     0,     0,     0,     0,     0,     0,     0,     1,     2,
-       5,     0,     9,     8,    10,    12,    11,    13,    14
+      35,     0,    34,     0,     0,     0,    33,     0,     0,     0,
+      16,     0,     0,     0,     0,     3,    11,    17,    18,    19,
+      10,     0,     0,    32,     0,    15,     4,     6,     8,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     1,
+      12,     2,     0,     0,    14,    29,    35,    33,     5,     0,
+       9,     0,     0,     0,    24,    23,    25,    27,    26,    28,
+      36,    36,     0,     7,    35,    35,    35,    30,    31,    36,
+      20,    21,    22,    13
   };
 
   const signed char
   tsParser::yypgoto_[] =
   {
-     -27,     5,     4,   -27,   -27
+     -60,   -11,   -60,    -6,   -60,   -60,   -60,   -60,   -60,   -60,
+      14,   -60,    53,   -59
   };
 
   const signed char
   tsParser::yydefgoto_[] =
   {
-      -1,     6,     7,     8,     9
+      -1,    13,    14,    15,    16,    17,    18,    19,    20,    21,
+      22,    23,    24,    67
   };
 
   const signed char
   tsParser::yytable_[] =
   {
-       1,    12,    13,    14,    15,    16,    17,    10,    11,    18,
-      20,    21,    19,    22,     0,     0,     2,    23,    24,    25,
-      26,    27,     0,     0,     0,    28,     0,     0,     0,     0,
-       3,     4,     5
+       1,     2,    68,     2,    41,    25,     3,     4,     5,    26,
+      73,    27,   -35,    29,    47,    28,     6,     7,     8,     9,
+       1,    42,    43,     2,   -35,   -35,     3,     4,     5,    33,
+      34,    35,    10,    11,    12,    62,     6,     7,     8,     9,
+      48,    30,    31,    50,    51,    52,    53,    36,    37,    38,
+      32,    39,    10,    11,    12,    46,    60,    61,    70,    71,
+      72,    40,    44,    63,    49,    54,    55,    56,    57,    58,
+       0,    59,    64,    65,    66,    69,    45
   };
 
   const signed char
   tsParser::yycheck_[] =
   {
-       3,     8,     9,    10,     8,     9,    10,    33,    16,     0,
-      33,    17,     7,    18,    -1,    -1,    19,    18,    18,    18,
-      18,    18,    -1,    -1,    -1,    21,    -1,    -1,    -1,    -1,
-      33,    34,    35
+       3,     6,    61,     6,    15,    35,     9,    10,    11,    19,
+      69,    19,    15,    29,    19,    19,    19,    20,    21,    22,
+       3,    23,    24,     6,    23,    24,     9,    10,    11,     9,
+      10,    11,    35,    36,    37,    46,    19,    20,    21,    22,
+      26,    17,    17,    29,    30,    31,    32,     9,    10,    11,
+      17,     0,    35,    36,    37,    15,    42,    43,    64,    65,
+      66,    35,    35,    49,    29,    19,    19,    19,    19,    19,
+      -1,    19,    18,    18,    18,    16,    23
   };
 
   const signed char
   tsParser::yystos_[] =
   {
-       0,     3,    19,    33,    34,    35,    37,    38,    39,    40,
-      33,    16,     8,     9,    10,     8,     9,    10,     0,    37,
-      33,    17,    18,    18,    18,    18,    18,    18,    38
+       0,     3,     6,     9,    10,    11,    19,    20,    21,    22,
+      35,    36,    37,    39,    40,    41,    42,    43,    44,    45,
+      46,    47,    48,    49,    50,    35,    19,    19,    19,    29,
+      17,    17,    17,     9,    10,    11,     9,    10,    11,     0,
+      35,    39,    23,    24,    35,    50,    15,    19,    48,    29,
+      48,    48,    48,    48,    19,    19,    19,    19,    19,    19,
+      48,    48,    39,    48,    18,    18,    18,    51,    51,    16,
+      41,    41,    41,    51
   };
 
   const signed char
   tsParser::yyr1_[] =
   {
-       0,    36,    37,    37,    38,    38,    38,    38,    39,    39,
-      39,    39,    39,    39,    40
+       0,    38,    39,    39,    40,    40,    40,    40,    40,    40,
+      41,    41,    41,    41,    41,    41,    41,    42,    42,    42,
+      43,    44,    45,    46,    46,    46,    46,    46,    46,    47,
+      48,    48,    48,    49,    49,    50,    51
   };
 
   const signed char
   tsParser::yyr2_[] =
   {
-       0,     2,     2,     1,     1,     2,     2,     1,     3,     3,
-       3,     3,     3,     3,     4
+       0,     2,     2,     1,     2,     3,     2,     4,     2,     3,
+       1,     1,     2,     5,     2,     2,     1,     1,     1,     1,
+       5,     5,     5,     3,     3,     3,     3,     3,     3,     2,
+       4,     4,     1,     1,     1,     0,     0
   };
 
 
@@ -1092,23 +1269,25 @@ namespace ts {
   const char*
   const tsParser::yytname_[] =
   {
-  "$end", "error", "$undefined", "tstEND", "tstCONST_BOOL",
+  "$end", "error", "$undefined", "tstEND", "tstTRUE", "tstFALSE",
   "tstCONST_INT", "tstCONST_FLOAT", "tstCONST_STRING", "tstDEF_BOOL",
-  "tstDEF_INT", "tstDEF_FLOAT", "tstDEF_STRING", "tstOPEN_BRACKET",
-  "tstCLOSE_BRACKET", "tstOPEN_CBRACKET", "tstCLOSE_CBRACKET",
-  "tstOPEN_PAREN", "tstCLOSE_PAREN", "tstIDENTIFIER", "tstIF", "tstWHILE",
-  "tstADD", "tstSUB", "tstMUL", "tstDIV", "tstLESS", "tstMORE", "tstEQUAL",
-  "tstLESS_EQUAL", "tstMORE_EQUAL", "tstAND", "tstOR", "tstNOT",
-  "tstEXP_END", "tstGLOBAL_REF", "tstGLOBAL_IN", "$accept", "line",
-  "statement", "preprocessor", "expression", YY_NULLPTR
+  "tstDEF_INT", "tstDEF_FLOAT", "tstDEF_STRING", "\"[\"", "\"]\"", "\"{\"",
+  "\"}\"", "\"(\"", "\")\"", "tstIDENTIFIER", "tstIF", "tstWHILE",
+  "tstFOR", "\"+\"", "\"-\"", "tstMUL", "tstDIV", "tstLESS", "tstMORE",
+  "\"=\"", "tstLESS_EQUAL", "tstMORE_EQUAL", "tstAND", "tstOR", "tstNOT",
+  "\";\"", "tstGLOBAL_REF", "tstGLOBAL_IN", "$accept", "line", "variable",
+  "statement", "flow", "if", "while", "for", "preprocessor", "expStart",
+  "expression", "value", "enterScope", "exitScope", YY_NULLPTR
   };
 
 #if YYDEBUG
-  const signed char
+  const unsigned char
   tsParser::yyrline_[] =
   {
-       0,    79,    79,    80,    83,    84,    85,    86,    89,    90,
-      91,    92,    93,    94,    97
+       0,    92,    92,    93,    96,    97,    98,    99,   100,   101,
+     105,   106,   107,   108,   109,   110,   111,   115,   116,   117,
+     120,   123,   126,   129,   130,   131,   132,   133,   134,   137,
+     139,   140,   141,   144,   145,   148,   149
   };
 
   // Print the state stack on the debug stream.
@@ -1178,9 +1357,9 @@ namespace ts {
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
-      35
+      35,    36,    37
     };
-    const int user_token_number_max_ = 290;
+    const int user_token_number_max_ = 292;
 
     if (t <= 0)
       return yyeof_;
@@ -1190,11 +1369,11 @@ namespace ts {
       return yy_undef_token_;
   }
 
-#line 6 "config.y"
+#line 7 "bison.y"
 } // ts
-#line 1196 "config.tab.cc"
+#line 1375 "bison.tab.cc"
 
-#line 100 "config.y"
+#line 151 "bison.y"
 
 
 void ts::tsParser::error(const location_type &l, const std::string &err_message){

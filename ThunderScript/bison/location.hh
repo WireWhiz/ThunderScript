@@ -53,7 +53,7 @@
 #  endif
 # endif
 
-#line 6 "config.y"
+#line 7 "bison.y"
 namespace ts {
 #line 59 "location.hh"
 
@@ -327,7 +327,7 @@ namespace ts {
     return ostr;
   }
 
-#line 6 "config.y"
+#line 7 "bison.y"
 } // ts
 #line 333 "location.hh"
 

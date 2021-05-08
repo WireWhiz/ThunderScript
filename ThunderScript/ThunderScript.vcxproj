@@ -161,12 +161,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="bison\config.tab.cc" />
+    <ClCompile Include="bison\bison.tab.cc" />
     <ClCompile Include="bison\lex.yy.cc" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\ThunderScriptCompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bison\config.tab.hh" />
+    <ClInclude Include="bison\bison.tab.hh" />
     <ClInclude Include="bison\FlexLexer.h">
       <FileType>CppHeader</FileType>
     </ClInclude>
@@ -177,8 +178,8 @@
     <ClInclude Include="src\TSBytecodeDebugger.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="bison\config.l" />
-    <None Include="bison\config.y" />
+    <None Include="bison\flex.l" />
+    <None Include="bison\bison.y" />
     <None Include="scripts\HelloWorld.thun" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
