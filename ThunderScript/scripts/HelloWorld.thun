@@ -13,7 +13,7 @@ report is correct
 */
 
 r = 0;
-int limit = 2000000000;
+int limit = 200;
 int addition = 1;
 while (r < limit){
 	r = r + addition;
